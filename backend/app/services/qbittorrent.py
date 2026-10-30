@@ -7,6 +7,7 @@ query seeding status, and manage torrent files.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -49,6 +50,9 @@ class QBittorrentClient:
         self.password = password or settings.QBITTORRENT_PASSWORD
         self._client: httpx.AsyncClient | None = None
         self._authenticated: bool = False
+        self._torrents_cache: list[dict[str, Any]] | None = None
+        self._torrents_cache_time: float = 0.0
+        self._torrent_files_cache: dict[str, list[dict[str, Any]]] = {}
 
     @property
     def is_configured(self) -> bool:
@@ -70,6 +74,9 @@ class QBittorrentClient:
             await self._client.aclose()
             self._client = None
             self._authenticated = False
+        self._torrents_cache = None
+        self._torrents_cache_time = 0.0
+        self._torrent_files_cache.clear()
 
     async def _authenticate(self) -> None:
         """Authenticate with qBittorrent if not already logged in."""
@@ -117,6 +124,7 @@ class QBittorrentClient:
         filter_state: str = "all",
         category: str = "",
         hashes: str = "",
+        use_cache: bool = False,
     ) -> list[dict[str, Any]]:
         """Return all torrents matching the filter criteria.
 
@@ -124,14 +132,26 @@ class QBittorrentClient:
             filter_state: Filter by state (all, downloading, seeding, etc.).
             category: Filter by category.
             hashes: Pipe-separated list of torrent hashes to filter.
+            use_cache: If True and querying all torrents, use 30s in-memory cache.
         """
+        if use_cache and filter_state == "all" and not category and not hashes:
+            now = time.time()
+            if self._torrents_cache is not None and (now - self._torrents_cache_time < 30.0):
+                return self._torrents_cache
+
         params: dict[str, Any] = {"filter": filter_state}
         if category:
             params["category"] = category
         if hashes:
             params["hashes"] = hashes
         resp = await self._request("GET", "/api/v2/torrents/info", params=params)
-        return resp.json()
+        data = resp.json()
+
+        if filter_state == "all" and not category and not hashes:
+            self._torrents_cache = data
+            self._torrents_cache_time = time.time()
+
+        return data
 
     async def get_torrent_files(self, torrent_hash: str) -> list[dict[str, Any]]:
         """Return file list for a specific torrent.
@@ -190,32 +210,91 @@ class QBittorrentClient:
         )
         return True
 
+    @staticmethod
+    def _extract_title_tokens(text: str) -> set[str]:
+        """Extract meaningful alphanumeric tokens (>= 3 chars) ignoring common scene noise."""
+        import re
+        tokens = re.findall(r"[a-zA-Z0-9]{3,}", text.lower())
+        ignored = {
+            "2160p", "1080p", "720p", "480p", "bluray", "webdl", "webrip",
+            "remux", "x264", "x265", "hevc", "truehd", "atmos", "dts", "ac3",
+            "eac3", "aac", "hdr", "hdr10", "dovi", "uhd", "repack", "proper",
+            "mkv", "mp4", "avi", "complete", "season", "episode", "movies",
+            "shows", "media", "downloads", "torrents", "usenet"
+        }
+        return {t for t in tokens if t not in ignored}
+
     async def find_torrent_by_file_path(self, file_path: str) -> dict[str, Any] | None:
         """Find the active/completed torrent associated with a file path."""
         import os
-        base_name = os.path.basename(file_path)
-        torrents = await self.get_torrents()
+        base_name = os.path.basename(file_path).lower()
+        file_path_lower = file_path.lower()
+        torrents = await self.get_torrents(use_cache=True)
 
-        # 1. Fast match by content_path or exact path
+        # 1. Fast match by exact content_path, basename, or path substring
         for t in torrents:
-            content_path = t.get("content_path", "")
+            content_path = (t.get("content_path") or "").lower()
             if content_path:
-                if content_path == file_path or (len(content_path) >= 6 and (content_path in file_path or file_path.endswith(content_path))):
+                if (
+                    content_path == file_path_lower
+                    or file_path_lower.endswith(content_path)
+                    or content_path.endswith(file_path_lower)
+                    or (len(content_path) >= 8 and content_path in file_path_lower)
+                ):
                     return t
-            t_name = t.get("name", "")
-            if t_name and (t_name == base_name or (len(t_name) >= 6 and t_name.lower() in file_path.lower())):
+            t_name = (t.get("name") or "").lower()
+            if t_name and (t_name == base_name or (len(t_name) >= 8 and t_name in file_path_lower)):
                 return t
 
-        # 2. Match by individual file names inside torrents
+        # 2. Inode & hardlink lookup if file exists on disk
+        try:
+            if os.path.exists(file_path):
+                from app.engine.hardlink_utils import HardlinkUtils
+                if HardlinkUtils.is_hardlinked(file_path):
+                    for search_dir in ["/downloads", "/data"]:
+                        if os.path.exists(search_dir):
+                            hl_matches = HardlinkUtils.find_hardlinks_in_directory(file_path, search_dir)
+                            for hl in hl_matches:
+                                hl_lower = hl.lower()
+                                for t in torrents:
+                                    c_path = (t.get("content_path") or "").lower()
+                                    s_path = (t.get("save_path") or "").lower()
+                                    if c_path and (c_path == hl_lower or hl_lower.startswith(c_path)):
+                                        return t
+                                    if s_path and hl_lower.startswith(s_path):
+                                        return t
+        except Exception as e:
+            logger.debug("Hardlink filesystem lookup skipped: %s", e)
+
+        # 3. Targeted file-list check ONLY for candidate torrents with matching title tokens
+        target_tokens = self._extract_title_tokens(file_path)
+        if not target_tokens:
+            return None
+
         for t in torrents:
             t_hash = t.get("hash")
             if not t_hash:
                 continue
+
+            t_name = (t.get("name") or "").lower()
+            t_tokens = self._extract_title_tokens(t_name)
+
+            # Skip torrents with zero token overlap
+            if not (target_tokens & t_tokens):
+                continue
+
             try:
-                files = await self.get_torrent_files(t_hash)
+                # Use cached torrent files if already fetched
+                if t_hash in self._torrent_files_cache:
+                    files = self._torrent_files_cache[t_hash]
+                else:
+                    files = await self.get_torrent_files(t_hash)
+                    self._torrent_files_cache[t_hash] = files
+
                 for f in files:
-                    f_name = f.get("name", "")
-                    if base_name and (base_name == f_name or base_name == os.path.basename(f_name) or (len(base_name) >= 6 and base_name in f_name)):
+                    f_name = (f.get("name") or "").lower()
+                    f_base = os.path.basename(f_name)
+                    if base_name in (f_name, f_base) or (len(base_name) >= 8 and base_name in f_name):
                         return t
             except Exception:
                 continue

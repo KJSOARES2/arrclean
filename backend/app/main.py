@@ -28,6 +28,10 @@ logging.basicConfig(
     level=log_level,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
+# Silence routine per-request HTTP access logging from httpx/httpcore
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 root_logger = logging.getLogger()
 root_logger.addHandler(BroadcastLogHandler())
 logger = logging.getLogger("arrclean.main")
