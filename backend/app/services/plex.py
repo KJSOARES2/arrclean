@@ -41,7 +41,8 @@ class PlexClient:
     def __init__(self, url: str | None = None, token: str | None = None) -> None:
         settings = get_settings()
         self.base_url = (url or settings.PLEX_URL).rstrip("/")
-        self.token = token or settings.PLEX_TOKEN
+        raw_token = token if (token and "•" not in token and token != "••••••••") else settings.PLEX_TOKEN
+        self.token = raw_token.strip() if raw_token else ""
         self._client: httpx.AsyncClient | None = None
 
     @property

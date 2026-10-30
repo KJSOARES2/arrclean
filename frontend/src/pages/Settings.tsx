@@ -61,28 +61,29 @@ export const Settings: React.FC = () => {
     setTestStates((prev) => ({ ...prev, [service]: { loading: true } }));
     try {
       let reqData: any = { service };
+      const isMasked = (val?: string) => !val || val.includes('•') || val === '••••••••';
       if (service === 'plex') {
         reqData.url = form.PLEX_URL;
-        reqData.token = form.PLEX_TOKEN;
+        if (!isMasked(form.PLEX_TOKEN)) reqData.token = form.PLEX_TOKEN;
       } else if (service === 'radarr') {
         reqData.url = form.RADARR_URL;
-        reqData.apikey = form.RADARR_APIKEY;
+        if (!isMasked(form.RADARR_APIKEY)) reqData.apikey = form.RADARR_APIKEY;
       } else if (service === 'sonarr') {
         reqData.url = form.SONARR_URL;
-        reqData.apikey = form.SONARR_APIKEY;
+        if (!isMasked(form.SONARR_APIKEY)) reqData.apikey = form.SONARR_APIKEY;
       } else if (service === 'qbittorrent') {
         reqData.url = form.QBITTORRENT_URL;
         reqData.username = form.QBITTORRENT_USERNAME;
-        reqData.password = form.QBITTORRENT_PASSWORD;
+        if (!isMasked(form.QBITTORRENT_PASSWORD)) reqData.password = form.QBITTORRENT_PASSWORD;
       } else if (service === 'sabnzbd') {
         reqData.url = form.SABNZBD_URL;
-        reqData.apikey = form.SABNZBD_APIKEY;
+        if (!isMasked(form.SABNZBD_APIKEY)) reqData.apikey = form.SABNZBD_APIKEY;
       } else if (service === 'overseerr') {
         reqData.url = form.OVERSEERR_URL;
-        reqData.apikey = form.OVERSEERR_APIKEY;
+        if (!isMasked(form.OVERSEERR_APIKEY)) reqData.apikey = form.OVERSEERR_APIKEY;
       } else if (service === 'prowlarr') {
         reqData.url = form.PROWLARR_URL;
-        reqData.apikey = form.PROWLARR_APIKEY;
+        if (!isMasked(form.PROWLARR_APIKEY)) reqData.apikey = form.PROWLARR_APIKEY;
       }
 
       const res = await api.testConnection(reqData);

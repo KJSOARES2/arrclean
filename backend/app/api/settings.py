@@ -117,7 +117,7 @@ async def update_settings(
 
     for key, value in updates.items():
         # Do not overwrite with placeholder mask
-        if isinstance(value, str) and value == "••••••••":
+        if isinstance(value, str) and ("•" in value or value == "••••••••"):
             continue
 
         stmt = select(AppSettings).where(AppSettings.key == key)

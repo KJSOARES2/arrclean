@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app.config import get_settings
 from app.services import (
     NotificationService,
     OverseerrClient,
@@ -25,6 +26,16 @@ from app.services import (
 logger = logging.getLogger("arrclean.api.connections")
 
 router = APIRouter(prefix="/connections", tags=["connections"])
+
+
+def _clean_credential(val: str | None, fallback: str) -> str:
+    """Return stripped credential or fallback if value is empty or masked."""
+    if not val:
+        return fallback or ""
+    v = val.strip()
+    if not v or "•" in v or v == "••••••••":
+        return fallback or ""
+    return v
 
 
 def _is_safe_service_url(url_str: str | None) -> tuple[bool, str]:
@@ -89,47 +100,64 @@ async def test_single_connection(req: ConnectionTestRequest) -> dict[str, Any]:
             "error": f"Security validation error: {url_err}",
         }
 
+    settings = get_settings()
+
     try:
         if service == "plex":
-            client = PlexClient(url=req.url, token=req.token)
+            token = _clean_credential(req.token, settings.PLEX_TOKEN)
+            url = (req.url or settings.PLEX_URL or "").strip()
+            client = PlexClient(url=url, token=token)
             details = await client.test_connection()
             success = details.get("connected", False) or "server_name" in details or "version" in details
             await client.close()
 
         elif service == "radarr":
-            client = RadarrClient(url=req.url, apikey=req.apikey or req.token)
+            apikey = _clean_credential(req.apikey or req.token, settings.RADARR_APIKEY)
+            url = (req.url or settings.RADARR_URL or "").strip()
+            client = RadarrClient(url=url, apikey=apikey)
             details = await client.test_connection()
             success = details.get("ok", False) or "version" in details
             await client.close()
 
         elif service == "sonarr":
-            client = SonarrClient(url=req.url, apikey=req.apikey or req.token)
+            apikey = _clean_credential(req.apikey or req.token, settings.SONARR_APIKEY)
+            url = (req.url or settings.SONARR_URL or "").strip()
+            client = SonarrClient(url=url, apikey=apikey)
             details = await client.test_connection()
             success = details.get("ok", False) or "version" in details
             await client.close()
 
         elif service == "qbittorrent":
+            username = req.username if req.username is not None and req.username != "" else settings.QBITTORRENT_USERNAME
+            password = _clean_credential(req.password, settings.QBITTORRENT_PASSWORD)
+            url = (req.url or settings.QBITTORRENT_URL or "").strip()
             client = QBittorrentClient(
-                url=req.url, username=req.username or "", password=req.password or ""
+                url=url, username=username or "", password=password or ""
             )
             details = await client.test_connection()
             success = details.get("connected", False) or "version" in details
             await client.close()
 
         elif service == "sabnzbd":
-            client = SABnzbdClient(url=req.url, apikey=req.apikey or req.token)
+            apikey = _clean_credential(req.apikey or req.token, settings.SABNZBD_APIKEY)
+            url = (req.url or settings.SABNZBD_URL or "").strip()
+            client = SABnzbdClient(url=url, apikey=apikey)
             details = await client.test_connection()
             success = details.get("ok", False) or "version" in details
             await client.close()
 
         elif service == "overseerr":
-            client = OverseerrClient(url=req.url, apikey=req.apikey or req.token)
+            apikey = _clean_credential(req.apikey or req.token, settings.OVERSEERR_APIKEY)
+            url = (req.url or settings.OVERSEERR_URL or "").strip()
+            client = OverseerrClient(url=url, apikey=apikey)
             details = await client.test_connection()
             success = details.get("ok", False) or "version" in details
             await client.close()
 
         elif service == "prowlarr":
-            client = ProwlarrClient(url=req.url, apikey=req.apikey or req.token)
+            apikey = _clean_credential(req.apikey or req.token, settings.PROWLARR_APIKEY)
+            url = (req.url or settings.PROWLARR_URL or "").strip()
+            client = ProwlarrClient(url=url, apikey=apikey)
             details = await client.test_connection()
             success = details.get("ok", False) or "version" in details
             await client.close()
@@ -141,6 +169,9 @@ async def test_single_connection(req: ConnectionTestRequest) -> dict[str, Any]:
         logger.warning("Connection test failed for %s: %s", service, e)
         error = str(e)
         success = False
+
+    if not success and not error:
+        error = details.get("error") or "Connection test failed. Check URL and credentials."
 
     return {
         "service": service,

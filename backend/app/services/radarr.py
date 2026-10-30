@@ -41,7 +41,8 @@ class RadarrClient:
     def __init__(self, url: str | None = None, apikey: str | None = None) -> None:
         settings = get_settings()
         self.base_url = (url or settings.RADARR_URL).rstrip("/")
-        self.apikey = apikey or settings.RADARR_APIKEY
+        raw_key = apikey if (apikey and "•" not in apikey and apikey != "••••••••") else settings.RADARR_APIKEY
+        self.apikey = raw_key.strip() if raw_key else ""
         self._client: httpx.AsyncClient | None = None
 
     @property

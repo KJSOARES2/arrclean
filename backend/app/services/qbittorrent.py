@@ -46,8 +46,9 @@ class QBittorrentClient:
     ) -> None:
         settings = get_settings()
         self.base_url = (url or settings.QBITTORRENT_URL).rstrip("/")
-        self.username = username or settings.QBITTORRENT_USERNAME
-        self.password = password or settings.QBITTORRENT_PASSWORD
+        self.username = username if username is not None and username != "" else settings.QBITTORRENT_USERNAME
+        raw_pw = password if (password and "•" not in password and password != "••••••••") else settings.QBITTORRENT_PASSWORD
+        self.password = raw_pw.strip() if raw_pw else ""
         self._client: httpx.AsyncClient | None = None
         self._authenticated: bool = False
         self._torrents_cache: list[dict[str, Any]] | None = None

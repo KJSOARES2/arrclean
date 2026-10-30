@@ -119,3 +119,26 @@ async def test_notify_scan_complete_arguments() -> None:
         error="Test warning",
     )
     assert isinstance(res, dict)
+
+
+@pytest.mark.asyncio
+async def test_connection_test_with_masked_token(client: AsyncClient) -> None:
+    # Testing sonarr and radarr with masked token '••••••••' must not raise UnicodeEncodeError
+    resp = await client.post(
+        "/api/v1/connections/test",
+        json={"service": "sonarr", "url": "http://127.0.0.1:8989", "apikey": "••••••••"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["service"] == "sonarr"
+    assert "ascii" not in (data.get("error") or "")
+
+    resp_radarr = await client.post(
+        "/api/v1/connections/test",
+        json={"service": "radarr", "url": "http://127.0.0.1:7878", "apikey": "••••••••"},
+    )
+    assert resp_radarr.status_code == 200
+    data_radarr = resp_radarr.json()
+    assert data_radarr["service"] == "radarr"
+    assert "ascii" not in (data_radarr.get("error") or "")
+
