@@ -224,8 +224,16 @@ class QBittorrentClient:
         }
         return {t for t in tokens if t not in ignored}
 
-    async def find_torrent_by_file_path(self, file_path: str) -> dict[str, Any] | None:
-        """Find the active/completed torrent associated with a file path."""
+    async def find_torrent_by_file_path(
+        self, file_path: str, deep_search: bool = False
+    ) -> dict[str, Any] | None:
+        """Find the active/completed torrent associated with a file path.
+
+        Args:
+            file_path: The filesystem path of the media file.
+            deep_search: If True, inspects file lists inside candidate torrents.
+                         Disabled by default to prevent slow sequential API queries.
+        """
         import os
         base_name = os.path.basename(file_path).lower()
         file_path_lower = file_path.lower()
@@ -266,11 +274,16 @@ class QBittorrentClient:
         except Exception as e:
             logger.debug("Hardlink filesystem lookup skipped: %s", e)
 
-        # 3. Targeted file-list check ONLY for candidate torrents with matching title tokens
+        # If deep_search is not requested, return now without per-torrent HTTP queries
+        if not deep_search:
+            return None
+
+        # 3. Targeted file-list check ONLY for up to 3 candidate torrents with matching title tokens
         target_tokens = self._extract_title_tokens(file_path)
         if not target_tokens:
             return None
 
+        checked_candidates = 0
         for t in torrents:
             t_hash = t.get("hash")
             if not t_hash:
@@ -282,6 +295,10 @@ class QBittorrentClient:
             # Skip torrents with zero token overlap
             if not (target_tokens & t_tokens):
                 continue
+
+            checked_candidates += 1
+            if checked_candidates > 3:
+                break
 
             try:
                 # Use cached torrent files if already fetched

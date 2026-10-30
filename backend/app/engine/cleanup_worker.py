@@ -129,7 +129,7 @@ class CleanupWorker:
         # Step 1: Detect torrent if not already recorded
         if not torrent_hash and self.services.qbittorrent.is_configured:
             try:
-                t = await self.services.qbittorrent.find_torrent_by_file_path(loser_path)
+                t = await self.services.qbittorrent.find_torrent_by_file_path(loser_path, deep_search=True)
                 if t:
                     torrent_hash = t.get("hash")
                     loser.torrent_hash = torrent_hash

@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: arrclean
-    image: arrclean:latest
+    image: arrclean:v1.0.1
     restart: unless-stopped
     ports:
       - "9494:9494"
