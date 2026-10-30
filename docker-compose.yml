@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  arrclean:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: arrclean
+    image: arrclean:latest
+    restart: unless-stopped
+    ports:
+      - "9494:9494"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+      - ARRCLEAN_DRY_RUN=true
+      - ARRCLEAN_DATABASE_URL=sqlite+aiosqlite:///./data/arrclean.db
+    env_file:
+      - .env
+    volumes:
+      # Application database and configuration state
+      - ./data:/app/data
+      # Mount media library for inspection and deduplication (read-only or rw depending on deletion mode)
+      - /path/to/media:/media
+      # Mount torrent downloads directory for hardlink / inode verification
+      - /path/to/downloads:/downloads
+
+  # Optional PostgreSQL service (Uncomment if using PostgreSQL instead of SQLite)
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: arrclean-postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     - POSTGRES_DB=arrclean
+  #     - POSTGRES_USER=arrclean
+  #     - POSTGRES_PASSWORD=secretpassword
+  #   volumes:
+  #     - ./postgres_data:/var/lib/postgresql/data
+  #   profiles: ["postgres"]
