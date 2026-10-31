@@ -101,10 +101,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await close_db()
 
 
+APP_VERSION = "1.0.1"
+
 app = FastAPI(
     title="ArrClean",
     description="Automated Media Deduplication & Lifecycle Manager",
-    version="1.0.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
@@ -122,7 +124,7 @@ app.add_middleware(
 @app.get("/api/v1/health", tags=["health"])
 async def health_check() -> dict[str, str]:
     """Health check endpoint."""
-    return {"status": "ok", "service": "ArrClean", "version": "1.0.0"}
+    return {"status": "ok", "service": "ArrClean", "version": APP_VERSION}
 
 
 # WebSocket alias for root /ws/logs
