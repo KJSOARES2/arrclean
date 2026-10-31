@@ -35,7 +35,11 @@ class OverseerrClient:
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
                 base_url=self.base_url,
-                headers={"X-Api-Key": self.apikey},
+                headers={
+                    "X-Api-Key": self.apikey,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
                 timeout=30.0,
             )
         return self._client
@@ -132,10 +136,9 @@ class OverseerrClient:
             status_str = str(status).lower()
 
         try:
-            body = {"is4k": is4k} if is4k else None
             resp = await client.post(
                 f"/api/v1/media/{media_id}/{status_str}",
-                json=body,
+                json={"is4k": bool(is4k)},
             )
             resp.raise_for_status()
             return True
