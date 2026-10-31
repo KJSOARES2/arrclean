@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -186,8 +186,10 @@ async def force_delete_duplicate(pair_id: int) -> dict[str, Any]:
 
 
 @router.post("/approve-all")
-async def approve_all_duplicates(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
-    """Bulk approve all pending duplicate pairs and process cleanup."""
+async def approve_all_duplicates(
+    background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)
+) -> dict[str, Any]:
+    """Bulk approve all pending duplicate pairs and process cleanup in background."""
     stmt = select(DuplicatePair).where(DuplicatePair.status == DuplicatePairStatus.PENDING_REVIEW)
     pending_pairs = list((await db.execute(stmt)).scalars().all())
 
@@ -196,20 +198,20 @@ async def approve_all_duplicates(db: AsyncSession = Depends(get_db)) -> dict[str
     await db.commit()
 
     worker = CleanupWorker()
-    res = await worker.process_all_approved()
+    background_tasks.add_task(worker.process_all_approved)
     return {
         "status": "bulk_approved",
         "count": len(pending_pairs),
-        "cleanup_summary": res,
+        "message": f"Approved {len(pending_pairs)} duplicates. Cleanup is running in the background.",
     }
 
 
 @router.post("/execute-approved")
-async def execute_approved_cleanups() -> dict[str, Any]:
-    """Process and execute cleanup on all currently approved duplicate pairs."""
+async def execute_approved_cleanups(background_tasks: BackgroundTasks) -> dict[str, Any]:
+    """Process and execute cleanup on all currently approved duplicate pairs in background."""
     worker = CleanupWorker()
-    res = await worker.process_all_approved()
+    background_tasks.add_task(worker.process_all_approved)
     return {
-        "status": "executed",
-        "cleanup_summary": res,
+        "status": "executing",
+        "message": "Cleanup execution initiated in the background.",
     }

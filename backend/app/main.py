@@ -101,7 +101,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await close_db()
 
 
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 
 app = FastAPI(
     title="ArrClean",

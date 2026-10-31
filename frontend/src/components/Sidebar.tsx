@@ -87,7 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ dryRunActive = true }) => {
 
       {/* Footer Info */}
       <div className="p-4 border-t border-slate-800/80 text-[11px] text-slate-500 font-mono">
-        <div>v1.0.1 • Docker Edition</div>
+        <div>v1.0.2 • Docker Edition</div>
         <div className="text-slate-600 mt-0.5">Port 9494 • APScheduler</div>
       </div>
     </aside>

@@ -87,16 +87,25 @@ class CleanupWorker:
                 force_delete,
             )
 
-            result = await self._execute_cleanup(
-                session=session,
-                pair=pair,
-                winner=winner,
-                loser=loser,
-                dry_run=dry_run,
-                force_delete=force_delete,
-            )
-            await session.commit()
-            return result
+            try:
+                result = await self._execute_cleanup(
+                    session=session,
+                    pair=pair,
+                    winner=winner,
+                    loser=loser,
+                    dry_run=dry_run,
+                    force_delete=force_delete,
+                )
+                await session.commit()
+                return result
+            except Exception as exc:
+                logger.exception("Failed to execute cleanup for pair %d: %s", pair.id, exc)
+                try:
+                    pair.status = DuplicatePairStatus.ERROR
+                    await session.commit()
+                except Exception:
+                    await session.rollback()
+                return {"success": False, "error": str(exc)}
 
     async def process_all_approved(self) -> dict[str, Any]:
         """Process all duplicate pairs currently in APPROVED status or pending dry-run execution."""
@@ -254,20 +263,27 @@ class CleanupWorker:
                     pair.status = DuplicatePairStatus.ERROR
                     return {"success": False, "error": unlink_res.get("error")}
 
-                # Create SeedLockEntry
-                seed_entry = SeedLockEntry(
-                    duplicate_pair_id=pair.id,
-                    torrent_hash=torrent_hash,
-                    torrent_name=seed_info.get("name") or os.path.basename(loser_path),
-                    file_path=loser_path,
-                    current_ratio=seed_info.get("ratio", 0.0),
-                    target_ratio=self.settings.MIN_SEED_RATIO,
-                    current_seed_days=int(seed_info.get("seeding_time_days", 0)),
-                    target_seed_days=self.settings.MIN_SEED_DAYS,
-                    status=SeedLockStatus.SEEDING,
-                    created_at=_utcnow(),
-                )
-                session.add(seed_entry)
+                # Create or update SeedLockEntry
+                existing_entry_stmt = select(SeedLockEntry).where(SeedLockEntry.duplicate_pair_id == pair.id)
+                existing_entry = (await session.execute(existing_entry_stmt)).scalar_one_or_none()
+                if not existing_entry:
+                    seed_entry = SeedLockEntry(
+                        duplicate_pair_id=pair.id,
+                        torrent_hash=torrent_hash,
+                        torrent_name=seed_info.get("name") or os.path.basename(loser_path),
+                        file_path=loser_path,
+                        current_ratio=seed_info.get("ratio", 0.0),
+                        target_ratio=self.settings.MIN_SEED_RATIO,
+                        current_seed_days=int(seed_info.get("seeding_time_days", 0)),
+                        target_seed_days=self.settings.MIN_SEED_DAYS,
+                        status=SeedLockStatus.SEEDING,
+                        created_at=_utcnow(),
+                    )
+                    session.add(seed_entry)
+                else:
+                    existing_entry.current_ratio = seed_info.get("ratio", 0.0)
+                    existing_entry.current_seed_days = int(seed_info.get("seeding_time_days", 0))
+                    existing_entry.status = SeedLockStatus.SEEDING
 
                 pair.status = DuplicatePairStatus.SEED_LOCKED
                 pair.action_taken = ActionTaken.HARDLINK_REMOVED
@@ -281,19 +297,26 @@ class CleanupWorker:
                 }
             else:
                 # Not a hardlink, cannot unlink without killing seed data. Place in seed-lock directly.
-                seed_entry = SeedLockEntry(
-                    duplicate_pair_id=pair.id,
-                    torrent_hash=torrent_hash,
-                    torrent_name=seed_info.get("name") or os.path.basename(loser_path),
-                    file_path=loser_path,
-                    current_ratio=seed_info.get("ratio", 0.0),
-                    target_ratio=self.settings.MIN_SEED_RATIO,
-                    current_seed_days=int(seed_info.get("seeding_time_days", 0)),
-                    target_seed_days=self.settings.MIN_SEED_DAYS,
-                    status=SeedLockStatus.SEEDING,
-                    created_at=_utcnow(),
-                )
-                session.add(seed_entry)
+                existing_entry_stmt = select(SeedLockEntry).where(SeedLockEntry.duplicate_pair_id == pair.id)
+                existing_entry = (await session.execute(existing_entry_stmt)).scalar_one_or_none()
+                if not existing_entry:
+                    seed_entry = SeedLockEntry(
+                        duplicate_pair_id=pair.id,
+                        torrent_hash=torrent_hash,
+                        torrent_name=seed_info.get("name") or os.path.basename(loser_path),
+                        file_path=loser_path,
+                        current_ratio=seed_info.get("ratio", 0.0),
+                        target_ratio=self.settings.MIN_SEED_RATIO,
+                        current_seed_days=int(seed_info.get("seeding_time_days", 0)),
+                        target_seed_days=self.settings.MIN_SEED_DAYS,
+                        status=SeedLockStatus.SEEDING,
+                        created_at=_utcnow(),
+                    )
+                    session.add(seed_entry)
+                else:
+                    existing_entry.current_ratio = seed_info.get("ratio", 0.0)
+                    existing_entry.current_seed_days = int(seed_info.get("seeding_time_days", 0))
+                    existing_entry.status = SeedLockStatus.SEEDING
                 pair.status = DuplicatePairStatus.SEED_LOCKED
                 pair.action_taken = ActionTaken.SEED_LOCK_QUEUED
 

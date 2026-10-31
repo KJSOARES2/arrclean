@@ -111,8 +111,9 @@ export const Duplicates: React.FC = () => {
         'All pending duplicate pairs will have their winners retained. Inferior copies will either be deleted or transferred to the Seed-Lock queue if active in qBittorrent.',
       onConfirm: async () => {
         try {
-          await api.approveAllDuplicates();
+          const res = await api.approveAllDuplicates();
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+          alert(res.message || `Approved ${res.count} duplicates.`);
           refresh();
         } catch (e) {
           alert(`Error during bulk approval: ${e}`);
@@ -126,12 +127,12 @@ export const Duplicates: React.FC = () => {
       isOpen: true,
       title: 'Execute All Approved Cleanups?',
       message:
-        'All approved duplicate cleanups will be processed. If live deletion mode is active, inferior files will be unlinked or removed from media storage, and any seeding torrents will be transferred to the Seed-Lock Watchlist.',
+        'All approved duplicate cleanups will be processed in the background. If live deletion mode is active, inferior files will be unlinked or removed from media storage, and any seeding torrents will be transferred to the Seed-Lock Watchlist.',
       onConfirm: async () => {
         try {
           const res = await api.executeApproved();
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-          alert(`Execution complete. Cleaned/locked: ${res.cleanup_summary.processed} files (${formatBytes(res.cleanup_summary.space_saved_bytes)}).`);
+          alert(res.message || 'Cleanup execution initiated in the background.');
           refresh();
         } catch (e) {
           alert(`Error executing approved cleanups: ${e}`);

@@ -156,6 +156,6 @@ async def test_execute_approved_cleanups_endpoint(client: AsyncClient) -> None:
     resp = await client.post("/api/v1/duplicates/execute-approved")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["status"] == "executed"
-    assert "cleanup_summary" in data
+    assert data["status"] == "executing"
+    assert "message" in data
 

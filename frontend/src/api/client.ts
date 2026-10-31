@@ -87,12 +87,12 @@ export const api = {
       { method: 'POST' }
     ),
   approveAllDuplicates: () =>
-    request<{ status: string; count: number; cleanup_summary: any }>(
+    request<{ status: string; count: number; message?: string; cleanup_summary?: any }>(
       '/duplicates/approve-all',
       { method: 'POST' }
     ),
   executeApproved: () =>
-    request<{ status: string; cleanup_summary: any }>(
+    request<{ status: string; message?: string; cleanup_summary?: any }>(
       '/duplicates/execute-approved',
       { method: 'POST' }
     ),
