@@ -25,11 +25,19 @@ async def client() -> AsyncClient:
 
     app.dependency_overrides[get_db] = override_get_db
 
+    import app.database as app_db
+    old_engine = app_db._engine
+    old_factory = app_db._session_factory
+    app_db._engine = engine
+    app_db._session_factory = session_factory
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
     app.dependency_overrides.clear()
+    app_db._engine = old_engine
+    app_db._session_factory = old_factory
     await engine.dispose()
 
 
@@ -141,4 +149,13 @@ async def test_connection_test_with_masked_token(client: AsyncClient) -> None:
     data_radarr = resp_radarr.json()
     assert data_radarr["service"] == "radarr"
     assert "ascii" not in (data_radarr.get("error") or "")
+
+
+@pytest.mark.asyncio
+async def test_execute_approved_cleanups_endpoint(client: AsyncClient) -> None:
+    resp = await client.post("/api/v1/duplicates/execute-approved")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "executed"
+    assert "cleanup_summary" in data
 

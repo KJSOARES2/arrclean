@@ -99,7 +99,7 @@ class CleanupWorker:
             return result
 
     async def process_all_approved(self) -> dict[str, Any]:
-        """Process all duplicate pairs currently in APPROVED status."""
+        """Process all duplicate pairs currently in APPROVED status or pending dry-run execution."""
         if self.session_factory is None:
             from app.database import get_session_factory
             self.session_factory = get_session_factory()
@@ -108,18 +108,40 @@ class CleanupWorker:
         space_saved = 0
         errors: list[str] = []
 
-        async with self.session_factory() as session:
-            stmt = select(DuplicatePair).where(DuplicatePair.status == DuplicatePairStatus.APPROVED)
-            res = await session.execute(stmt)
-            approved_pairs = list(res.scalars().all())
+        # Re-fetch latest settings in case DRY_RUN changed
+        self.settings = get_settings()
 
-        for p in approved_pairs:
-            res = await self.process_pair(p.id)
+        target_ids: list[int] = []
+        async with self.session_factory() as session:
+            stmt = select(DuplicatePair).where(
+                DuplicatePair.status.in_([
+                    DuplicatePairStatus.APPROVED,
+                    DuplicatePairStatus.SEED_LOCKED,
+                ])
+            )
+            res = await session.execute(stmt)
+            pairs_to_check = list(res.scalars().all())
+
+            for p in pairs_to_check:
+                if p.status == DuplicatePairStatus.APPROVED:
+                    target_ids.append(p.id)
+                elif p.status == DuplicatePairStatus.SEED_LOCKED:
+                    # Check if an actual SeedLockEntry row exists in database
+                    entry_stmt = select(SeedLockEntry).where(SeedLockEntry.duplicate_pair_id == p.id)
+                    entry = (await session.execute(entry_stmt)).scalar_one_or_none()
+                    if not entry:
+                        # Orphaned dry-run simulation pair; reset to APPROVED so it executes
+                        p.status = DuplicatePairStatus.APPROVED
+                        target_ids.append(p.id)
+            await session.commit()
+
+        for pid in target_ids:
+            res = await self.process_pair(pid)
             if res.get("success"):
                 processed += 1
                 space_saved += res.get("space_saved", 0)
             else:
-                errors.append(f"Pair {p.id}: {res.get('error')}")
+                errors.append(f"Pair {pid}: {res.get('error')}")
 
         return {
             "processed": processed,
@@ -218,7 +240,7 @@ class CleanupWorker:
             if is_hl:
                 # Remove library-side hardlink only! The download side file stays seeding intact.
                 if dry_run:
-                    pair.status = DuplicatePairStatus.SEED_LOCKED
+                    pair.status = DuplicatePairStatus.APPROVED
                     pair.action_taken = ActionTaken.NONE
                     return {
                         "success": True,

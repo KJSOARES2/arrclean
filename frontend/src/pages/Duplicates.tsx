@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
+  Play,
 } from 'lucide-react';
 import { Header } from '../components/Header';
 import { StatusBadge } from '../components/StatusBadge';
@@ -120,6 +121,25 @@ export const Duplicates: React.FC = () => {
     });
   };
 
+  const handleExecuteApproved = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Execute All Approved Cleanups?',
+      message:
+        'All approved duplicate cleanups will be processed. If live deletion mode is active, inferior files will be unlinked or removed from media storage, and any seeding torrents will be transferred to the Seed-Lock Watchlist.',
+      onConfirm: async () => {
+        try {
+          const res = await api.executeApproved();
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+          alert(`Execution complete. Cleaned/locked: ${res.cleanup_summary.processed} files (${formatBytes(res.cleanup_summary.space_saved_bytes)}).`);
+          refresh();
+        } catch (e) {
+          alert(`Error executing approved cleanups: ${e}`);
+        }
+      },
+    });
+  };
+
   return (
     <div className="flex-1 flex flex-col">
       <Header
@@ -181,6 +201,14 @@ export const Duplicates: React.FC = () => {
 
           {/* Bulk Action */}
           <div className="flex items-center space-x-3">
+            <button
+              onClick={handleExecuteApproved}
+              className="flex items-center space-x-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-950/40 transition-colors"
+              title="Process and execute cleanup on all approved pairs"
+            >
+              <Play className="w-4 h-4" />
+              <span>Execute Approved</span>
+            </button>
             <button
               onClick={handleApproveAll}
               className="flex items-center space-x-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-emerald-950/40 transition-colors"

@@ -45,6 +45,13 @@ def get_engine() -> AsyncEngine:
         connect_args: dict = {}
         if url.startswith("sqlite"):
             connect_args["check_same_thread"] = False
+            # Ensure parent directory exists for SQLite database files
+            db_path = url.split("sqlite+aiosqlite:///")[-1].split("?")[0]
+            if db_path and db_path != ":memory:":
+                import os
+                parent_dir = os.path.dirname(db_path)
+                if parent_dir:
+                    os.makedirs(parent_dir, exist_ok=True)
 
         _engine = create_async_engine(
             url,

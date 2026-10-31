@@ -91,6 +91,11 @@ export const api = {
       '/duplicates/approve-all',
       { method: 'POST' }
     ),
+  executeApproved: () =>
+    request<{ status: string; cleanup_summary: any }>(
+      '/duplicates/execute-approved',
+      { method: 'POST' }
+    ),
 
   // Seed Watch
   getSeedWatchList: () => request<SeedLockEntry[]>('/seed-watch'),

@@ -202,3 +202,14 @@ async def approve_all_duplicates(db: AsyncSession = Depends(get_db)) -> dict[str
         "count": len(pending_pairs),
         "cleanup_summary": res,
     }
+
+
+@router.post("/execute-approved")
+async def execute_approved_cleanups() -> dict[str, Any]:
+    """Process and execute cleanup on all currently approved duplicate pairs."""
+    worker = CleanupWorker()
+    res = await worker.process_all_approved()
+    return {
+        "status": "executed",
+        "cleanup_summary": res,
+    }

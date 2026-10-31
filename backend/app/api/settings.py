@@ -110,7 +110,9 @@ async def get_all_settings(db: AsyncSession = Depends(get_db)) -> dict[str, Any]
 
 @router.put("")
 async def update_settings(
-    payload: SettingsUpdatePayload, db: AsyncSession = Depends(get_db)
+    payload: SettingsUpdatePayload,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Persist settings overrides into the database and reload runtime clients."""
     updates = payload.model_dump(exclude_unset=True, exclude_none=True)
@@ -146,6 +148,12 @@ async def update_settings(
     # Reload runtime services with updated settings
     sm = get_service_manager()
     sm.reload(effective_settings)
+
+    # If live deletion mode was armed (DRY_RUN switched to False), trigger approved cleanups
+    if updates.get("DRY_RUN") is False:
+        from app.engine.cleanup_worker import CleanupWorker
+        worker = CleanupWorker()
+        background_tasks.add_task(worker.process_all_approved)
 
     return {"status": "updated", "updated_keys": list(updates.keys())}
 
