@@ -159,8 +159,20 @@ async def update_settings(
 
 
 @router.post("/scan/trigger")
-async def trigger_scan(background_tasks: BackgroundTasks) -> dict[str, Any]:
-    """Trigger an immediate full duplicate scan in the background."""
+async def trigger_scan(
+    background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)
+) -> dict[str, Any]:
+    """Trigger an immediate full duplicate scan in the background if not already running."""
+    # Guard against concurrent duplicate scans
+    running_stmt = select(ScanJob).where(ScanJob.status == JobStatus.RUNNING)
+    active_job = (await db.execute(running_stmt)).scalar_one_or_none()
+    if active_job:
+        return {
+            "status": "already_running",
+            "message": f"Scan job #{active_job.id} is already in progress.",
+            "job_id": active_job.id,
+        }
+
     scanner = DedupScanner()
     background_tasks.add_task(scanner.run_full_scan)
     return {"status": "scan_started", "message": "Full deduplication scan initiated."}

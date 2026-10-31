@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Play, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { api } from '../api/client';
+import { usePolling } from '../hooks/usePolling';
 
 interface HeaderProps {
   title: string;
@@ -13,17 +14,33 @@ export const Header: React.FC<HeaderProps> = ({
   title,
   subtitle,
   onRefresh,
-  isScanning = false,
+  isScanning: propIsScanning = false,
 }) => {
   const [triggering, setTriggering] = useState(false);
   const [triggerSuccess, setTriggerSuccess] = useState(false);
 
+  // Poll scan status every 3 seconds so all pages stay globally synchronized
+  const { data: scanStatus, refresh: refreshScanStatus } = usePolling(
+    api.getScanStatus,
+    3000
+  );
+
+  const activeScan = Boolean(
+    propIsScanning || triggering || scanStatus?.status === 'running'
+  );
+
   const handleScanNow = async () => {
+    if (activeScan) return;
     try {
       setTriggering(true);
-      await api.triggerScan();
-      setTriggerSuccess(true);
-      setTimeout(() => setTriggerSuccess(false), 3000);
+      const res = await api.triggerScan();
+      if (res.status === 'already_running') {
+        alert(res.message);
+      } else {
+        setTriggerSuccess(true);
+        setTimeout(() => setTriggerSuccess(false), 3000);
+      }
+      refreshScanStatus();
       if (onRefresh) onRefresh();
     } catch (e) {
       alert(`Failed to trigger scan: ${e}`);
@@ -54,16 +71,16 @@ export const Header: React.FC<HeaderProps> = ({
 
         <button
           onClick={handleScanNow}
-          disabled={triggering || isScanning}
+          disabled={activeScan}
           className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shadow-md ${
             triggerSuccess
               ? 'bg-emerald-600 text-white'
-              : isScanning || triggering
+              : activeScan
               ? 'bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-700'
               : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/40'
           }`}
         >
-          {isScanning || triggering ? (
+          {activeScan ? (
             <>
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
               <span>Scanning Library...</span>

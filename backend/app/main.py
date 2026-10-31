@@ -48,6 +48,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize DB tables
     await init_db()
 
+    # Reset any stale RUNNING scan jobs interrupted by a server restart
+    try:
+        from app.database import get_session_factory
+        from app.models.job_history import JobStatus, ScanJob
+        from datetime import datetime, timezone
+        from sqlalchemy import select
+        async with get_session_factory()() as session:
+            stale_stmt = select(ScanJob).where(ScanJob.status == JobStatus.RUNNING)
+            stale_jobs = list((await session.execute(stale_stmt)).scalars().all())
+            for sj in stale_jobs:
+                sj.status = JobStatus.FAILED
+                sj.error_message = "Scan interrupted by system restart."
+                sj.completed_at = datetime.now(timezone.utc)
+            if stale_jobs:
+                await session.commit()
+                logger.info("Marked %d interrupted scan jobs as failed", len(stale_jobs))
+    except Exception as e:
+        logger.debug("Stale job cleanup skipped: %s", e)
+
     # Load persistent settings overrides from DB
     try:
         from app.database import get_session_factory
