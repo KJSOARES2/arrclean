@@ -19,6 +19,7 @@ from app.engine.quality_scorer import (
     QualityWeights,
     Resolution,
 )
+from app.engine.tv_parser import TVParser
 from app.models.duplicate import (
     ActionTaken,
     DuplicatePair,
@@ -94,6 +95,28 @@ class DedupScanner:
 
         try:
             log_lines.append(f"Starting scan (Job #{scan_job_id}) at {_utcnow().isoformat()}")
+
+            # 0. Prune any previously saved invalid pairs with mismatched seasons/episodes
+            async with self.session_factory() as session:
+                existing_pending_stmt = (
+                    select(DuplicatePair)
+                    .where(DuplicatePair.status == DuplicatePairStatus.PENDING_REVIEW)
+                )
+                res = await session.execute(existing_pending_stmt)
+                pending_pairs = list(res.scalars().all())
+                pruned_count = 0
+                for pp in pending_pairs:
+                    w_rec = (await session.execute(select(DuplicateRecord).where(DuplicateRecord.id == pp.winner_record_id))).scalar_one_or_none()
+                    l_rec = (await session.execute(select(DuplicateRecord).where(DuplicateRecord.id == pp.loser_record_id))).scalar_one_or_none()
+                    if w_rec and l_rec:
+                        cand_w = {"media_type": w_rec.media_type, "season": w_rec.season, "episode": w_rec.episode, "file_path": w_rec.file_path}
+                        cand_l = {"media_type": l_rec.media_type, "season": l_rec.season, "episode": l_rec.episode, "file_path": l_rec.file_path}
+                        if not TVParser.are_candidates_compatible(cand_w, cand_l):
+                            await session.delete(pp)
+                            pruned_count += 1
+                if pruned_count > 0:
+                    await session.commit()
+                    log_lines.append(f"Pruned {pruned_count} invalid mismatched duplicate pairs from previous scans.")
 
             # 1. Scan Plex Movies & Radarr
             movie_pairs = await self._scan_movies(log_lines)
@@ -413,32 +436,41 @@ class DedupScanner:
                     sec_key = section.get("key", "")
                     items = await self.services.plex.get_library_items(sec_key, item_type=4)
 
-                    # Group episodes by title / season / episode
+                    # Group episodes by title / detected season / detected episode
                     episode_groups: dict[str, list[dict[str, Any]]] = {}
                     for item in items:
                         if item.get("type") == "episode" and len(item.get("Media", [])) > 1:
                             show_title = item.get("grandparentTitle", item.get("title", "Unknown"))
-                            season = item.get("parentIndex")
-                            episode = item.get("index")
-                            key = f"{show_title}_S{season}E{episode}"
+                            fallback_season = item.get("parentIndex")
+                            fallback_episode = item.get("index")
 
                             parsed = self.services.plex.parse_media_item(item)
-                            episode_groups[key] = [
-                                {
-                                    "title": f"{show_title} S{season:02d}E{episode:02d}" if season and episode else show_title,
+                            for p in parsed:
+                                if not p.file_path:
+                                    continue
+
+                                # Extract true season and episode from filename and directory
+                                file_season, file_ep, _ = TVParser.parse_season_episode(
+                                    p.file_path,
+                                    fallback_season=fallback_season,
+                                    fallback_episode=fallback_episode,
+                                )
+
+                                # Group strictly by show title + detected season + detected episode
+                                key = f"{show_title.strip().lower()}_S{file_season}E{file_ep}"
+                                episode_groups.setdefault(key, []).append({
+                                    "title": f"{show_title} S{file_season:02d}E{file_ep:02d}" if file_season and file_ep else show_title,
                                     "show_title": show_title,
-                                    "season": season,
-                                    "episode": episode,
+                                    "season": file_season,
+                                    "episode": file_ep,
                                     "file_path": p.file_path,
                                     "file_size": p.file_size,
                                     "resolution": p.resolution,
                                     "video_codec": p.video_codec,
                                     "audio_codec": p.audio_codec,
+                                    "duration_ms": p.duration_ms,
                                     "plex_rating_key": p.rating_key,
-                                }
-                                for p in parsed
-                                if p.file_path
-                            ]
+                                })
 
                     for ep_key, ep_files in episode_groups.items():
                         if len(ep_files) >= 2:
@@ -551,6 +583,15 @@ class DedupScanner:
 
         pairs: list[dict[str, Any]] = []
         for loser in losers:
+            # Enforce strict compatibility: never pair mismatched seasons, episodes, or divergent durations
+            if not TVParser.are_candidates_compatible(winner["record"], loser["record"]):
+                logger.warning(
+                    "Rejected incompatible duplicate pair: '%s' vs '%s'",
+                    winner["record"].get("file_path"),
+                    loser["record"].get("file_path"),
+                )
+                continue
+
             pairs.append({
                 "media_type": winner["record"]["media_type"],
                 "title": winner["record"]["title"],

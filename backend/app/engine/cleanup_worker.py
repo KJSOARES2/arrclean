@@ -61,8 +61,22 @@ class CleanupWorker:
             winner = pair.winner
             loser = pair.loser
 
-            if not loser:
-                return {"success": False, "error": "Loser record missing"}
+            if not loser or not winner:
+                return {"success": False, "error": "Winner or loser record missing"}
+
+            # Safety verification: ensure winner and loser are compatible duplicate candidates
+            from app.engine.tv_parser import TVParser
+            w_cand = {"media_type": winner.media_type, "season": winner.season, "episode": winner.episode, "file_path": winner.file_path}
+            l_cand = {"media_type": loser.media_type, "season": loser.season, "episode": loser.episode, "file_path": loser.file_path}
+            if not TVParser.are_candidates_compatible(w_cand, l_cand):
+                err = (
+                    f"Safety block: Winner ({winner.file_path}) and Loser ({loser.file_path}) "
+                    "belong to different seasons or episodes. Deletion aborted."
+                )
+                logger.error(err)
+                pair.status = DuplicatePairStatus.IGNORED
+                await session.commit()
+                return {"success": False, "error": err}
 
             dry_run = self.settings.DRY_RUN and not force_delete
             logger.info(
