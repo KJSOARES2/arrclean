@@ -83,6 +83,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.debug("Startup database hygiene check skipped: %s", e)
 
+    # Seed lock hygiene: reconcile duplicate pairs and seed lock queue
+    try:
+        from app.database import get_session_factory
+        from app.engine.seed_monitor import reconcile_seed_lock_entries
+        async with get_session_factory()() as session:
+            seed_stats = await reconcile_seed_lock_entries(session)
+            if sum(seed_stats.values()) > 0:
+                await session.commit()
+                logger.info(
+                    "Startup seed lock hygiene: backfilled %d, completed %d, reset %d orphaned pairs.",
+                    seed_stats["backfilled"],
+                    seed_stats["completed"],
+                    seed_stats["reset_to_approved"],
+                )
+    except Exception as e:
+        logger.debug("Startup seed lock hygiene check skipped: %s", e)
+
     # Load persistent settings overrides from DB
     try:
         from app.database import get_session_factory
@@ -117,7 +134,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await close_db()
 
 
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 
 app = FastAPI(
     title="ArrClean",

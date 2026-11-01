@@ -98,6 +98,22 @@ async def prune_ghost_and_duplicate_pairs(session: AsyncSession) -> dict[str, in
         else:
             seen_pending_losers.add(l_rec.file_path)
 
+    # 3. SEED_LOCKED pairs: prune invalid ghost pairs or resolve completed losers
+    seed_stmt = select(DuplicatePair).where(DuplicatePair.status == DuplicatePairStatus.SEED_LOCKED)
+    seed_pairs = list((await session.execute(seed_stmt)).scalars().all())
+    for sp in seed_pairs:
+        w_rec = (await session.execute(select(DuplicateRecord).where(DuplicateRecord.id == sp.winner_record_id))).scalar_one_or_none()
+        l_rec = (await session.execute(select(DuplicateRecord).where(DuplicateRecord.id == sp.loser_record_id))).scalar_one_or_none()
+        if not w_rec or not l_rec or not l_rec.file_path:
+            await session.delete(sp)
+            stats["pruned_ghost_pending"] += 1
+            continue
+        if l_rec.file_path in seen_completed_losers:
+            sp.status = DuplicatePairStatus.COMPLETED
+            sp.action_taken = ActionTaken.DELETED
+            sp.resolved_at = datetime.now(timezone.utc)
+            stats["pruned_redundant_completed"] += 1
+
     total_pruned = sum(stats.values())
     if total_pruned > 0:
         await session.commit()

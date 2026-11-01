@@ -23,6 +23,13 @@ router = APIRouter(prefix="/seed-watch", tags=["seed-watch"])
 @router.get("")
 async def list_seed_watch(db: AsyncSession = Depends(get_db)) -> list[dict[str, Any]]:
     """List all entries in the Seed-Lock queue with live progress metrics."""
+    from app.engine.seed_monitor import reconcile_seed_lock_entries
+    try:
+        await reconcile_seed_lock_entries(db)
+        await db.commit()
+    except Exception as recon_err:
+        logger.debug("Seed lock reconciliation during list_seed_watch skipped: %s", recon_err)
+
     stmt = (
         select(SeedLockEntry)
         .order_by(SeedLockEntry.status.asc(), SeedLockEntry.created_at.desc())

@@ -304,6 +304,16 @@ class CleanupWorker:
                 }
             else:
                 # Not a hardlink, cannot unlink without killing seed data. Place in seed-lock directly.
+                if dry_run:
+                    pair.status = DuplicatePairStatus.APPROVED
+                    pair.action_taken = ActionTaken.NONE
+                    return {
+                        "success": True,
+                        "dry_run": True,
+                        "action": "Would place torrent into seed-lock queue (retention requirements active)",
+                        "space_saved": 0,
+                    }
+
                 existing_entry_stmt = select(SeedLockEntry).where(SeedLockEntry.duplicate_pair_id == pair.id)
                 existing_entry = (await session.execute(existing_entry_stmt)).scalar_one_or_none()
                 if not existing_entry:

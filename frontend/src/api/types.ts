@@ -87,6 +87,8 @@ export interface SeedLockEntry {
 export interface DashboardStats {
   total_space_reclaimed_bytes: number;
   pending_space_to_reclaim_bytes: number;
+  seed_locked_space_bytes?: number;
+  pending_review_space_bytes?: number;
   duplicates_found_count: number;
   duplicates_resolved_count: number;
   pending_review_count: number;

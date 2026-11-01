@@ -30,13 +30,22 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)) -> dict[str, A
     )
     total_reclaimed = (await db.execute(reclaimed_stmt)).scalar() or 0
 
-    # 2. Pending Space (SEED_LOCKED or PENDING_REVIEW)
-    pending_stmt = select(func.coalesce(func.sum(DuplicatePair.space_saved_bytes), 0)).where(
-        DuplicatePair.status.in_([DuplicatePairStatus.SEED_LOCKED, DuplicatePairStatus.PENDING_REVIEW])
+    # 2. Seed-Locked Space (torrents currently locked in qBittorrent)
+    seed_locked_space_stmt = select(func.coalesce(func.sum(DuplicatePair.space_saved_bytes), 0)).where(
+        DuplicatePair.status == DuplicatePairStatus.SEED_LOCKED
     )
-    pending_reclaim = (await db.execute(pending_stmt)).scalar() or 0
+    seed_locked_space = (await db.execute(seed_locked_space_stmt)).scalar() or 0
 
-    # 3. Counts
+    # 3. Pending Review Space (duplicates awaiting manual review)
+    pending_review_space_stmt = select(func.coalesce(func.sum(DuplicatePair.space_saved_bytes), 0)).where(
+        DuplicatePair.status == DuplicatePairStatus.PENDING_REVIEW
+    )
+    pending_review_space = (await db.execute(pending_review_space_stmt)).scalar() or 0
+
+    # 4. Total Pending Space (for backward compatibility)
+    pending_reclaim = seed_locked_space + pending_review_space
+
+    # 5. Counts
     total_found_stmt = select(func.count(DuplicatePair.id))
     total_found = (await db.execute(total_found_stmt)).scalar() or 0
 
@@ -50,10 +59,17 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)) -> dict[str, A
     )
     pending_review_count = (await db.execute(pending_review_stmt)).scalar() or 0
 
-    seed_locked_stmt = select(func.count(DuplicatePair.id)).where(
+    active_seed_entries_stmt = select(func.count(SeedLockEntry.id)).where(
+        SeedLockEntry.status == SeedLockStatus.SEEDING
+    )
+    active_seed_entries = (await db.execute(active_seed_entries_stmt)).scalar() or 0
+
+    seed_locked_pairs_stmt = select(func.count(DuplicatePair.id)).where(
         DuplicatePair.status == DuplicatePairStatus.SEED_LOCKED
     )
-    seed_locked_count = (await db.execute(seed_locked_stmt)).scalar() or 0
+    seed_locked_pairs = (await db.execute(seed_locked_pairs_stmt)).scalar() or 0
+
+    seed_locked_count = max(active_seed_entries, seed_locked_pairs)
 
     # 4. Active Scan Job
     active_job_stmt = (
@@ -76,6 +92,8 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)) -> dict[str, A
     return {
         "total_space_reclaimed_bytes": total_reclaimed,
         "pending_space_to_reclaim_bytes": pending_reclaim,
+        "seed_locked_space_bytes": seed_locked_space,
+        "pending_review_space_bytes": pending_review_space,
         "duplicates_found_count": total_found,
         "duplicates_resolved_count": resolved_count,
         "pending_review_count": pending_review_count,

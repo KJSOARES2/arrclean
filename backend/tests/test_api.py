@@ -57,7 +57,10 @@ async def test_dashboard_stats(client: AsyncClient) -> None:
     data = resp.json()
     assert "total_space_reclaimed_bytes" in data
     assert "pending_space_to_reclaim_bytes" in data
+    assert "seed_locked_space_bytes" in data
+    assert "pending_review_space_bytes" in data
     assert "duplicates_found_count" in data
+    assert "seed_locked_count" in data
 
 
 @pytest.mark.asyncio
@@ -158,4 +161,77 @@ async def test_execute_approved_cleanups_endpoint(client: AsyncClient) -> None:
     data = resp.json()
     assert data["status"] == "executing"
     assert "message" in data
+
+
+@pytest.mark.asyncio
+async def test_seed_watch_endpoints_and_reconciliation(client: AsyncClient) -> None:
+    # 1. Empty seed watch list
+    resp = await client.get("/api/v1/seed-watch")
+    assert resp.status_code == 200
+    assert isinstance(resp.json(), list)
+
+    # 2. Add an orphaned SEED_LOCKED pair directly in DB
+    import app.database as app_db
+    from app.models.duplicate import DuplicatePair, DuplicatePairStatus, DuplicateRecord, ActionTaken
+    from app.models.seed_lock import SeedLockEntry, SeedLockStatus
+
+    async with app_db._session_factory() as session:
+        win = DuplicateRecord(media_type="movie", title="Test Movie", file_path="/mock/path/win.mkv", file_size_bytes=2000)
+        lose = DuplicateRecord(media_type="movie", title="Test Movie", file_path="/mock/path/lose.mkv", file_size_bytes=1000, torrent_hash="hash123")
+        session.add(win)
+        session.add(lose)
+        await session.flush()
+
+        pair = DuplicatePair(
+            media_type="movie",
+            title="Test Movie",
+            winner_record_id=win.id,
+            loser_record_id=lose.id,
+            status=DuplicatePairStatus.SEED_LOCKED,
+            space_saved_bytes=1000,
+        )
+        session.add(pair)
+        await session.commit()
+
+    # In default settings (DRY_RUN=True), calling seed-watch reconciles orphaned dry-run pair to APPROVED
+    resp2 = await client.get("/api/v1/seed-watch")
+    assert resp2.status_code == 200
+
+    # Verify dashboard accurately reports stats without mismatch
+    dash_resp = await client.get("/api/v1/dashboard/stats")
+    assert dash_resp.status_code == 200
+    dash_data = dash_resp.json()
+    assert dash_data["seed_locked_count"] == 0
+
+    # 3. Now insert an actual active SeedLockEntry
+    async with app_db._session_factory() as session:
+        pair.status = DuplicatePairStatus.SEED_LOCKED
+        entry = SeedLockEntry(
+            duplicate_pair_id=pair.id,
+            torrent_hash="hash123",
+            torrent_name="Test.Movie.2024.1080p",
+            file_path="/mock/path/lose.mkv",
+            current_ratio=0.5,
+            target_ratio=1.0,
+            current_seed_days=30,
+            target_seed_days=90,
+            status=SeedLockStatus.SEEDING,
+        )
+        session.add(entry)
+        await session.commit()
+
+    # Calling seed-watch returns the active entry with live progress
+    resp3 = await client.get("/api/v1/seed-watch")
+    assert resp3.status_code == 200
+    items = resp3.json()
+    assert len(items) == 1
+    assert items[0]["torrent_name"] == "Test.Movie.2024.1080p"
+    assert items[0]["current_ratio"] == 0.5
+    assert items[0]["ratio_progress_percent"] == 50.0
+
+    # Calling manual check endpoint succeeds
+    check_resp = await client.post("/api/v1/seed-watch/check")
+    assert check_resp.status_code == 200
+    assert check_resp.json()["status"] == "completed"
+
 

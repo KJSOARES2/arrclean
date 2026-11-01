@@ -21,6 +21,7 @@ import {
   ArrowUpRight,
   Sparkles,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { StatusBadge } from '../components/StatusBadge';
@@ -97,33 +98,40 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Pending Reclaim (Seed-Locked) */}
-          <div className="glass-card p-4 sm:p-6 relative overflow-hidden group">
+          {/* Seeding Watchlist (Seed-Locked) */}
+          <Link
+            to="/seed-watch"
+            className="glass-card p-4 sm:p-6 relative overflow-hidden group hover:border-blue-500/40 transition-all block"
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Pending Reclaim
+                Seeding Watchlist
               </span>
-              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 group-hover:bg-blue-500/20 transition-colors">
                 <Clock className="w-5 h-5" />
               </div>
             </div>
             <div className="mt-3 sm:mt-4">
               <div className="text-2xl sm:text-3xl font-bold tracking-tight text-white font-mono truncate">
-                {statsLoading ? '...' : formatBytes(stats?.pending_space_to_reclaim_bytes ?? 0)}
+                {statsLoading ? '...' : formatBytes(stats?.seed_locked_space_bytes ?? 0)}
               </div>
-              <div className="text-xs text-slate-400 mt-2 truncate">
-                Locked in qBittorrent ({stats?.seed_locked_count ?? 0} torrents)
+              <div className="text-xs text-slate-400 mt-2 truncate flex items-center justify-between">
+                <span>{stats?.seed_locked_count ?? 0} torrents active in qBittorrent</span>
+                <span className="text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity font-medium">View &rarr;</span>
               </div>
             </div>
-          </div>
+          </Link>
 
           {/* Duplicates Found */}
-          <div className="glass-card p-4 sm:p-6 relative overflow-hidden group">
+          <Link
+            to="/duplicates"
+            className="glass-card p-4 sm:p-6 relative overflow-hidden group hover:border-purple-500/40 transition-all block"
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 Duplicates Detected
               </span>
-              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 group-hover:bg-purple-500/20 transition-colors">
                 <Layers className="w-5 h-5" />
               </div>
             </div>
@@ -131,11 +139,14 @@ export const Dashboard: React.FC = () => {
               <div className="text-2xl sm:text-3xl font-bold tracking-tight text-white font-mono truncate">
                 {statsLoading ? '...' : stats?.duplicates_found_count ?? 0}
               </div>
-              <div className="text-xs text-amber-400 mt-2 font-medium truncate">
-                {stats?.pending_review_count ?? 0} awaiting manual review
+              <div className="text-xs text-amber-400 mt-2 font-medium truncate flex items-center justify-between">
+                <span>
+                  {stats?.pending_review_count ?? 0} awaiting review ({formatBytes(stats?.pending_review_space_bytes ?? (stats?.pending_space_to_reclaim_bytes ?? 0))})
+                </span>
+                <span className="text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity font-medium">Review &rarr;</span>
               </div>
             </div>
-          </div>
+          </Link>
 
           {/* Scan State */}
           <div className="glass-card p-4 sm:p-6 relative overflow-hidden group">
