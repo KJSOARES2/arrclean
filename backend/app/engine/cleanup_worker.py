@@ -152,6 +152,13 @@ class CleanupWorker:
             else:
                 errors.append(f"Pair {pid}: {res.get('error')}")
 
+        if processed > 0 and self.services.plex.is_configured:
+            try:
+                await self.services.plex.refresh_all_sections()
+                await self.services.plex.empty_all_trash()
+            except Exception as e:
+                logger.warning("Plex post-cleanup library refresh/empty-trash failed: %s", e)
+
         return {
             "processed": processed,
             "space_saved_bytes": space_saved,
@@ -362,6 +369,7 @@ class CleanupWorker:
                 for f in files:
                     if f.get("path") == loser_path:
                         await self.services.radarr.delete_movie_file(f["id"])
+                        file_deleted = True
                         break
             except Exception as e:
                 logger.warning("Radarr file un-track failed: %s", e)
@@ -371,9 +379,24 @@ class CleanupWorker:
                 for f in files:
                     if f.get("path") == loser_path:
                         await self.services.sonarr.delete_episode_file(f["id"])
+                        file_deleted = True
                         break
             except Exception as e:
                 logger.warning("Sonarr file un-track failed: %s", e)
+
+        # If the file was not deleted because it was already missing before cleanup:
+        if not file_deleted and not os.path.exists(loser_path):
+            logger.info("Loser file %s was already removed from disk/services; completing pair with 0 bytes saved.", loser_path)
+            pair.space_saved_bytes = 0
+            pair.status = DuplicatePairStatus.COMPLETED
+            pair.action_taken = ActionTaken.DELETED
+            pair.resolved_at = _utcnow()
+            await self._post_cleanup_reconcile(winner, loser)
+            return {
+                "success": True,
+                "action": f"File already removed from disk/services: {loser_path}",
+                "space_saved": 0,
+            }
 
         pair.status = DuplicatePairStatus.COMPLETED
         pair.action_taken = ActionTaken.DELETED
@@ -388,13 +411,18 @@ class CleanupWorker:
         }
 
     async def _post_cleanup_reconcile(self, winner: DuplicateRecord, loser: DuplicateRecord) -> None:
-        """Trigger post-cleanup sync: Plex refresh, Overseerr availability, Arr rescan."""
-        # 1. Plex Refresh
-        if self.services.plex.is_configured and winner.plex_rating_key:
+        """Trigger post-cleanup sync: Plex refresh & empty trash, Overseerr availability, Arr rescan."""
+        # 1. Plex Refresh & Empty Trash
+        if self.services.plex.is_configured:
+            if winner.plex_rating_key:
+                try:
+                    await self.services.plex.refresh_item(winner.plex_rating_key)
+                except Exception as e:
+                    logger.debug("Plex item refresh skipped: %s", e)
             try:
-                await self.services.plex.refresh_item(winner.plex_rating_key)
+                await self.services.plex.empty_all_trash()
             except Exception as e:
-                logger.debug("Plex item refresh skipped: %s", e)
+                logger.debug("Plex empty trash skipped: %s", e)
 
         # 2. Overseerr Availability
         if self.services.overseerr.is_configured and winner.tmdb_id:

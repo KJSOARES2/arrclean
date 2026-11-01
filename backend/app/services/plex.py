@@ -33,6 +33,9 @@ class PlexMediaItem:
     bitrate: int | None
     duration_ms: int | None
     added_at: int | None
+    tmdb_id: int | None = None
+    tvdb_id: int | None = None
+    imdb_id: str | None = None
 
 
 class PlexClient:
@@ -184,11 +187,43 @@ class PlexClient:
         resp = await client.put(f"/library/sections/{section_key}/emptyTrash")
         resp.raise_for_status()
 
+    async def empty_all_trash(self) -> None:
+        """Empty trash across all library sections to purge removed files."""
+        try:
+            libraries = await self.get_libraries()
+            for lib in libraries:
+                sec_key = lib.get("key")
+                if sec_key:
+                    try:
+                        await self.empty_trash(sec_key)
+                        logger.info("Emptied trash for Plex library section %s (%s)", sec_key, lib.get("title"))
+                    except Exception as e:
+                        logger.warning("Failed to empty trash for Plex section %s: %s", sec_key, e)
+        except Exception as e:
+            logger.warning("Failed to retrieve Plex libraries for emptying trash: %s", e)
+
+    async def refresh_all_sections(self) -> None:
+        """Trigger a library scan for all movie and show sections."""
+        try:
+            libraries = await self.get_libraries()
+            for lib in libraries:
+                if lib.get("type") in ("movie", "show"):
+                    sec_key = lib.get("key")
+                    if sec_key:
+                        try:
+                            await self.refresh_section(sec_key)
+                            logger.info("Triggered refresh for Plex library section %s (%s)", sec_key, lib.get("title"))
+                        except Exception as e:
+                            logger.warning("Failed to refresh Plex section %s: %s", sec_key, e)
+        except Exception as e:
+            logger.warning("Failed to retrieve Plex libraries for refresh: %s", e)
+
     def parse_media_item(self, metadata: dict[str, Any]) -> list[PlexMediaItem]:
         """Parse a Plex metadata dict into PlexMediaItem instances.
 
         A single metadata entry can have multiple Media objects (different
-        versions/editions), so this returns a list.
+        versions/editions), so this returns a list. Trashed/deleted parts
+        are skipped.
         """
         items: list[PlexMediaItem] = []
         title = metadata.get("title", "Unknown")
@@ -196,8 +231,51 @@ class PlexClient:
         media_type = "movie" if metadata.get("type") == "movie" else "episode"
         rating_key = str(metadata.get("ratingKey", ""))
 
+        # Extract external IDs from Guid list or guid string
+        tmdb_id: int | None = None
+        tvdb_id: int | None = None
+        imdb_id: str | None = None
+
+        for g in metadata.get("Guid", []):
+            guid_id = g.get("id", "")
+            if guid_id.startswith("tmdb://"):
+                try:
+                    tmdb_id = int(guid_id.replace("tmdb://", ""))
+                except ValueError:
+                    pass
+            elif guid_id.startswith("tvdb://"):
+                try:
+                    tvdb_id = int(guid_id.replace("tvdb://", ""))
+                except ValueError:
+                    pass
+            elif guid_id.startswith("imdb://"):
+                imdb_id = guid_id.replace("imdb://", "")
+
+        guid_str = str(metadata.get("guid", ""))
+        if not tmdb_id and "themoviedb://" in guid_str:
+            try:
+                tmdb_part = guid_str.split("themoviedb://")[1].split("?")[0]
+                tmdb_id = int(tmdb_part)
+            except (ValueError, IndexError):
+                pass
+        if not imdb_id and "imdb://" in guid_str:
+            try:
+                imdb_id = guid_str.split("imdb://")[1].split("?")[0]
+            except IndexError:
+                pass
+        if not tvdb_id and "thetvdb://" in guid_str:
+            try:
+                tvdb_part = guid_str.split("thetvdb://")[1].split("?")[0]
+                tvdb_id = int(tvdb_part)
+            except (ValueError, IndexError):
+                pass
+
         for media in metadata.get("Media", []):
+            if media.get("deletedAt"):
+                continue
             for part in media.get("Part", []):
+                if part.get("deletedAt"):
+                    continue
                 items.append(
                     PlexMediaItem(
                         rating_key=rating_key,
@@ -212,6 +290,9 @@ class PlexClient:
                         bitrate=media.get("bitrate"),
                         duration_ms=media.get("duration"),
                         added_at=metadata.get("addedAt"),
+                        tmdb_id=tmdb_id,
+                        tvdb_id=tvdb_id,
+                        imdb_id=imdb_id,
                     )
                 )
         return items

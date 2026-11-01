@@ -36,6 +36,75 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+async def prune_ghost_and_duplicate_pairs(session: AsyncSession) -> dict[str, int]:
+    """Prune invalid, ghost, and redundant duplicate pairs from the database.
+
+    1. Removes redundant COMPLETED pairs (keeping only the earliest record for each unique loser file path).
+    2. Removes PENDING_REVIEW pairs that target a loser file that was already COMPLETED (ghost duplicates).
+    3. Removes redundant PENDING_REVIEW pairs that duplicate another pending pair.
+    4. Removes invalid mismatched TV pairs (e.g. cross-season/cross-episode pairs).
+    """
+    stats = {
+        "pruned_mismatched": 0,
+        "pruned_redundant_completed": 0,
+        "pruned_ghost_pending": 0,
+    }
+
+    # 1. Redundant COMPLETED pairs: Keep only the earliest pair (min id) for each loser file path
+    completed_stmt = (
+        select(DuplicatePair)
+        .where(DuplicatePair.status == DuplicatePairStatus.COMPLETED)
+        .order_by(DuplicatePair.id.asc())
+    )
+    completed_pairs = list((await session.execute(completed_stmt)).scalars().all())
+    seen_completed_losers: set[str] = set()
+
+    for cp in completed_pairs:
+        l_rec = (await session.execute(select(DuplicateRecord).where(DuplicateRecord.id == cp.loser_record_id))).scalar_one_or_none()
+        if l_rec and l_rec.file_path:
+            if l_rec.file_path in seen_completed_losers:
+                await session.delete(cp)
+                stats["pruned_redundant_completed"] += 1
+            else:
+                seen_completed_losers.add(l_rec.file_path)
+
+    # 2. PENDING_REVIEW pairs: remove mismatched or already completed/duplicated
+    pending_stmt = (
+        select(DuplicatePair)
+        .where(DuplicatePair.status == DuplicatePairStatus.PENDING_REVIEW)
+        .order_by(DuplicatePair.id.asc())
+    )
+    pending_pairs = list((await session.execute(pending_stmt)).scalars().all())
+    seen_pending_losers: set[str] = set()
+
+    for pp in pending_pairs:
+        w_rec = (await session.execute(select(DuplicateRecord).where(DuplicateRecord.id == pp.winner_record_id))).scalar_one_or_none()
+        l_rec = (await session.execute(select(DuplicateRecord).where(DuplicateRecord.id == pp.loser_record_id))).scalar_one_or_none()
+        if not w_rec or not l_rec or not l_rec.file_path:
+            await session.delete(pp)
+            stats["pruned_ghost_pending"] += 1
+            continue
+
+        cand_w = {"media_type": w_rec.media_type, "season": w_rec.season, "episode": w_rec.episode, "file_path": w_rec.file_path}
+        cand_l = {"media_type": l_rec.media_type, "season": l_rec.season, "episode": l_rec.episode, "file_path": l_rec.file_path}
+        if not TVParser.are_candidates_compatible(cand_w, cand_l):
+            await session.delete(pp)
+            stats["pruned_mismatched"] += 1
+            continue
+
+        if l_rec.file_path in seen_completed_losers or l_rec.file_path in seen_pending_losers:
+            await session.delete(pp)
+            stats["pruned_ghost_pending"] += 1
+        else:
+            seen_pending_losers.add(l_rec.file_path)
+
+    total_pruned = sum(stats.values())
+    if total_pruned > 0:
+        await session.commit()
+
+    return stats
+
+
 class DedupScanner:
     """Scans media libraries and queues to detect duplicate files and evaluate quality."""
 
@@ -96,27 +165,23 @@ class DedupScanner:
         try:
             log_lines.append(f"Starting scan (Job #{scan_job_id}) at {_utcnow().isoformat()}")
 
-            # 0. Prune any previously saved invalid pairs with mismatched seasons/episodes
+            # Pre-scan: empty Plex trash to purge previously deleted files from Plex cache
+            if self.services.plex.is_configured:
+                try:
+                    await self.services.plex.empty_all_trash()
+                    log_lines.append("Emptied Plex library trash prior to scanning.")
+                except Exception as trash_err:
+                    logger.debug("Pre-scan Plex empty trash warning: %s", trash_err)
+
+            # 0. Prune any previously saved invalid pairs, ghosts, or redundant completed records
             async with self.session_factory() as session:
-                existing_pending_stmt = (
-                    select(DuplicatePair)
-                    .where(DuplicatePair.status == DuplicatePairStatus.PENDING_REVIEW)
-                )
-                res = await session.execute(existing_pending_stmt)
-                pending_pairs = list(res.scalars().all())
-                pruned_count = 0
-                for pp in pending_pairs:
-                    w_rec = (await session.execute(select(DuplicateRecord).where(DuplicateRecord.id == pp.winner_record_id))).scalar_one_or_none()
-                    l_rec = (await session.execute(select(DuplicateRecord).where(DuplicateRecord.id == pp.loser_record_id))).scalar_one_or_none()
-                    if w_rec and l_rec:
-                        cand_w = {"media_type": w_rec.media_type, "season": w_rec.season, "episode": w_rec.episode, "file_path": w_rec.file_path}
-                        cand_l = {"media_type": l_rec.media_type, "season": l_rec.season, "episode": l_rec.episode, "file_path": l_rec.file_path}
-                        if not TVParser.are_candidates_compatible(cand_w, cand_l):
-                            await session.delete(pp)
-                            pruned_count += 1
-                if pruned_count > 0:
-                    await session.commit()
-                    log_lines.append(f"Pruned {pruned_count} invalid mismatched duplicate pairs from previous scans.")
+                prune_stats = await prune_ghost_and_duplicate_pairs(session)
+                if sum(prune_stats.values()) > 0:
+                    log_lines.append(
+                        f"Database hygiene: pruned {prune_stats['pruned_redundant_completed']} redundant completed, "
+                        f"{prune_stats['pruned_ghost_pending']} ghost pending, and "
+                        f"{prune_stats['pruned_mismatched']} mismatched duplicate pairs."
+                    )
 
             # 1. Scan Plex Movies & Radarr
             movie_pairs = await self._scan_movies(log_lines)
@@ -133,7 +198,8 @@ class DedupScanner:
                     winner_data = pair_data["winner"]
                     loser_data = pair_data["loser"]
 
-                    # Check if an active pair for this loser file already exists
+                    # Check if an existing pair for this loser file already exists
+                    # Never resurrect pairs that are already COMPLETED, IGNORED, or active
                     existing_stmt = (
                         select(DuplicatePair)
                         .join(DuplicateRecord, DuplicatePair.loser_record_id == DuplicateRecord.id)
@@ -143,6 +209,8 @@ class DedupScanner:
                                 DuplicatePairStatus.PENDING_REVIEW,
                                 DuplicatePairStatus.APPROVED,
                                 DuplicatePairStatus.SEED_LOCKED,
+                                DuplicatePairStatus.COMPLETED,
+                                DuplicatePairStatus.IGNORED,
                             ])
                         )
                     )
@@ -241,22 +309,25 @@ class DedupScanner:
                         if len(media_list) > 1:
                             key = f"plex_movie_{item.get('ratingKey')}"
                             parsed = self.services.plex.parse_media_item(item)
-                            plex_movie_groups[key] = [
-                                {
-                                    "source": "plex",
-                                    "title": p.title,
-                                    "year": p.year,
-                                    "file_path": p.file_path,
-                                    "file_size": p.file_size,
-                                    "resolution": p.resolution,
-                                    "video_codec": p.video_codec,
-                                    "audio_codec": p.audio_codec,
-                                    "bitrate": p.bitrate,
-                                    "plex_rating_key": p.rating_key,
-                                }
-                                for p in parsed
-                                if p.file_path
-                            ]
+                            valid_parsed = [p for p in parsed if p.file_path]
+                            if len(valid_parsed) > 1:
+                                plex_movie_groups[key] = [
+                                    {
+                                        "source": "plex",
+                                        "title": p.title,
+                                        "year": p.year,
+                                        "tmdb_id": p.tmdb_id,
+                                        "imdb_id": p.imdb_id,
+                                        "file_path": p.file_path,
+                                        "file_size": p.file_size,
+                                        "resolution": p.resolution,
+                                        "video_codec": p.video_codec,
+                                        "audio_codec": p.audio_codec,
+                                        "bitrate": p.bitrate,
+                                        "plex_rating_key": p.rating_key,
+                                    }
+                                    for p in valid_parsed
+                                ]
             except Exception as e:
                 log_lines.append(f"Plex movie scan warning: {e}")
 
@@ -299,6 +370,13 @@ class DedupScanner:
         for group_key, file_items in plex_movie_groups.items():
             if len(file_items) < 2:
                 continue
+
+            # If some candidate files exist on disk in ArrClean's mount, filter out any files that do NOT exist
+            existing_on_disk = [item for item in file_items if os.path.exists(item["file_path"])]
+            if existing_on_disk and len(existing_on_disk) < len(file_items):
+                file_items = existing_on_disk
+                if len(file_items) < 2:
+                    continue
 
             evaluated_candidates: list[dict[str, Any]] = []
             for item in file_items:
@@ -474,6 +552,13 @@ class DedupScanner:
 
                     for ep_key, ep_files in episode_groups.items():
                         if len(ep_files) >= 2:
+                            # If some candidate files exist on disk in ArrClean's mount, filter out missing files
+                            existing_on_disk = [item for item in ep_files if os.path.exists(item["file_path"])]
+                            if existing_on_disk and len(existing_on_disk) < len(ep_files):
+                                ep_files = existing_on_disk
+                                if len(ep_files) < 2:
+                                    continue
+
                             # Map Sonarr series if available
                             first_item = ep_files[0]
                             parsed_show = first_item.get("show_title", "").strip().lower()

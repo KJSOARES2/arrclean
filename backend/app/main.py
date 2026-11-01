@@ -67,6 +67,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.debug("Stale job cleanup skipped: %s", e)
 
+    # Database hygiene: prune any ghost pending duplicates or redundant completed records
+    try:
+        from app.database import get_session_factory
+        from app.engine.dedup_scanner import prune_ghost_and_duplicate_pairs
+        async with get_session_factory()() as session:
+            prune_stats = await prune_ghost_and_duplicate_pairs(session)
+            if sum(prune_stats.values()) > 0:
+                logger.info(
+                    "Startup database hygiene: pruned %d redundant completed, %d ghost pending, and %d mismatched pairs.",
+                    prune_stats["pruned_redundant_completed"],
+                    prune_stats["pruned_ghost_pending"],
+                    prune_stats["pruned_mismatched"],
+                )
+    except Exception as e:
+        logger.debug("Startup database hygiene check skipped: %s", e)
+
     # Load persistent settings overrides from DB
     try:
         from app.database import get_session_factory
@@ -101,7 +117,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await close_db()
 
 
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 
 app = FastAPI(
     title="ArrClean",
