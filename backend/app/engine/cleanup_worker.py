@@ -208,8 +208,12 @@ class CleanupWorker:
                         "space_saved": loser.file_size_bytes,
                     }
 
-                # Real deletion of torrent + files
-                await self.services.qbittorrent.delete_torrent(torrent_hash, delete_files=True)
+                # Real deletion of torrent + files (if still present in qBittorrent)
+                if not seed_info.get("not_found"):
+                    try:
+                        await self.services.qbittorrent.delete_torrent(torrent_hash, delete_files=True)
+                    except Exception as qb_del_err:
+                        logger.debug("qBittorrent delete failed or torrent already removed: %s", qb_del_err)
 
                 # Ensure library-side file is also deleted if it still exists on disk
                 if os.path.exists(loser_path) and HardlinkUtils.is_safe_file_path(loser_path):

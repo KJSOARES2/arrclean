@@ -160,17 +160,29 @@ class QBittorrentClient:
         Args:
             torrent_hash: The torrent hash.
         """
-        resp = await self._request(
-            "GET", "/api/v2/torrents/files", params={"hash": torrent_hash}
-        )
-        return resp.json()
+        try:
+            resp = await self._request(
+                "GET", "/api/v2/torrents/files", params={"hash": torrent_hash}
+            )
+            return resp.json()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                logger.debug("Torrent %s not found in qBittorrent files (404)", torrent_hash)
+                return []
+            raise
 
     async def get_torrent_properties(self, torrent_hash: str) -> dict[str, Any]:
         """Return properties for a specific torrent."""
-        resp = await self._request(
-            "GET", "/api/v2/torrents/properties", params={"hash": torrent_hash}
-        )
-        return resp.json()
+        try:
+            resp = await self._request(
+                "GET", "/api/v2/torrents/properties", params={"hash": torrent_hash}
+            )
+            return resp.json()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                logger.debug("Torrent %s not found in qBittorrent properties (404)", torrent_hash)
+                return {}
+            raise
 
     async def delete_torrent(
         self, torrent_hash: str, delete_files: bool = False
@@ -184,18 +196,24 @@ class QBittorrentClient:
         Returns:
             True if deletion was successful.
         """
-        await self._request(
-            "POST",
-            "/api/v2/torrents/delete",
-            data={
-                "hashes": torrent_hash,
-                "deleteFiles": str(delete_files).lower(),
-            },
-        )
-        logger.info(
-            "Deleted torrent %s (files=%s)", torrent_hash[:8], delete_files
-        )
-        return True
+        try:
+            await self._request(
+                "POST",
+                "/api/v2/torrents/delete",
+                data={
+                    "hashes": torrent_hash,
+                    "deleteFiles": str(delete_files).lower(),
+                },
+            )
+            logger.info(
+                "Deleted torrent %s (files=%s)", torrent_hash[:8], delete_files
+            )
+            return True
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                logger.debug("Torrent %s already removed from qBittorrent (404)", torrent_hash)
+                return True
+            raise
 
     async def pause_torrent(self, torrent_hash: str) -> bool:
         """Pause a torrent."""
@@ -327,6 +345,23 @@ class QBittorrentClient:
         torrents = await self.get_torrents(hashes=torrent_hash)
         torrent = torrents[0] if torrents else {}
 
+        # If torrent is absent from qBittorrent (not seeding / already deleted), mark eligible for deletion
+        if not props and not torrent:
+            logger.info("Torrent %s is not active in qBittorrent; marking eligible for deletion", torrent_hash[:8])
+            return {
+                "hash": torrent_hash,
+                "name": "",
+                "ratio": 0.0,
+                "target_ratio": min_ratio,
+                "seeding_time_seconds": 0,
+                "seeding_time_days": 0.0,
+                "target_days": min_days,
+                "meets_ratio": True,
+                "meets_time": True,
+                "can_delete": True,
+                "not_found": True,
+            }
+
         ratio = float(props.get("share_ratio", torrent.get("ratio", 0.0)))
         seeding_time_sec = int(props.get("seeding_time", torrent.get("seeding_time", 0)))
         seeding_time_days = seeding_time_sec / 86400.0
@@ -346,6 +381,7 @@ class QBittorrentClient:
             "meets_ratio": meets_ratio,
             "meets_time": meets_time,
             "can_delete": can_delete,
+            "not_found": False,
         }
 
     def parse_torrent(self, data: dict[str, Any]) -> TorrentInfo:

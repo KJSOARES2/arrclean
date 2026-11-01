@@ -59,9 +59,19 @@ class OverseerrClient:
             resp = await client.get("/api/v1/status")
             resp.raise_for_status()
             data = resp.json()
+
+            # Verify API key authenticity
+            try:
+                auth_resp = await client.get("/api/v1/request", params={"take": 1})
+                if auth_resp.status_code in (401, 403):
+                    return {"ok": False, "error": f"Invalid Overseerr API key (HTTP {auth_resp.status_code})"}
+            except Exception as auth_err:
+                logger.debug("Overseerr auth check error: %s", auth_err)
+
+            version = data.get("version", "unknown")
             return {
                 "ok": True,
-                "version": data.get("version", "unknown"),
+                "version": version,
                 "name": "Overseerr",
             }
         except Exception as exc:
@@ -135,11 +145,25 @@ class OverseerrClient:
         else:
             status_str = str(status).lower()
 
+        params = {}
+        if is4k:
+            params["is4k"] = "true"
+
         try:
+            # First attempt with query param and empty content
             resp = await client.post(
                 f"/api/v1/media/{media_id}/{status_str}",
-                json={"is4k": bool(is4k)},
+                params=params,
+                content=b"",
+                headers={"Content-Type": "application/json"},
             )
+            if resp.status_code == 415:
+                # If reverse proxy or Overseerr rejects Content-Type header on empty POST, retry without Content-Type
+                resp = await client.post(
+                    f"/api/v1/media/{media_id}/{status_str}",
+                    params=params,
+                    headers={"Content-Type": None},
+                )
             resp.raise_for_status()
             return True
         except Exception as e:

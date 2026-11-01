@@ -235,3 +235,56 @@ async def test_seed_watch_endpoints_and_reconciliation(client: AsyncClient) -> N
     assert check_resp.json()["status"] == "completed"
 
 
+@pytest.mark.asyncio
+async def test_qbittorrent_missing_torrent_handled_gracefully() -> None:
+    from unittest.mock import AsyncMock, patch
+    import httpx
+    from app.services.qbittorrent import QBittorrentClient
+
+    client = QBittorrentClient(url="http://127.0.0.1:8080", username="admin", password="password")
+
+    # Mock 404 response on properties and files
+    req = httpx.Request("GET", "http://127.0.0.1:8080/api/v2/torrents/properties?hash=missing123")
+    resp_404 = httpx.Response(status_code=404, request=req)
+    err_404 = httpx.HTTPStatusError("Client error '404 Not Found'", request=req, response=resp_404)
+
+    with patch.object(client, "_request", new=AsyncMock(side_effect=err_404)):
+        # 1. get_torrent_properties should return {} rather than raising 404
+        props = await client.get_torrent_properties("missing123")
+        assert props == {}
+
+        # 2. get_torrent_files should return [] rather than raising 404
+        files = await client.get_torrent_files("missing123")
+        assert files == []
+
+        # 3. delete_torrent should return True rather than raising 404
+        del_res = await client.delete_torrent("missing123")
+        assert del_res is True
+
+    # 4. get_torrent_seeding_info should report can_delete=True, not_found=True
+    with patch.object(client, "get_torrent_properties", new=AsyncMock(return_value={})):
+        with patch.object(client, "get_torrents", new=AsyncMock(return_value=[])):
+            seed_info = await client.get_torrent_seeding_info("missing123")
+            assert seed_info["can_delete"] is True
+            assert seed_info["not_found"] is True
+
+
+@pytest.mark.asyncio
+async def test_overseerr_and_prowlarr_connection_tests(client: AsyncClient) -> None:
+    # Test overseerr and prowlarr connection test endpoints return valid schema
+    resp_overseerr = await client.post(
+        "/api/v1/connections/test",
+        json={"service": "overseerr", "url": "http://127.0.0.1:5055", "apikey": "mockkey"},
+    )
+    assert resp_overseerr.status_code == 200
+    assert resp_overseerr.json()["service"] == "overseerr"
+
+    resp_prowlarr = await client.post(
+        "/api/v1/connections/test",
+        json={"service": "prowlarr", "url": "http://127.0.0.1:9696", "apikey": "mockkey"},
+    )
+    assert resp_prowlarr.status_code == 200
+    assert resp_prowlarr.json()["service"] == "prowlarr"
+
+
+

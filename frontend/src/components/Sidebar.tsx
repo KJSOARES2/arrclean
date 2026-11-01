@@ -121,7 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Footer Info */}
       <div className="p-4 border-t border-slate-800/80 text-[11px] text-slate-500 font-mono pb-safe">
-        <div>v1.0.5 • Docker Edition</div>
+        <div>v1.0.6 • Docker Edition</div>
         <div className="text-slate-600 mt-0.5">Port 9494 • APScheduler</div>
       </div>
     </div>

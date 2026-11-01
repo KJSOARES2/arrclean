@@ -635,6 +635,30 @@ export const Settings: React.FC = () => {
                   className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200 font-mono"
                 />
               </div>
+              {testStates.overseerr && (
+                <div
+                  className={`flex items-center space-x-2 text-xs p-2.5 rounded-lg border ${
+                    testStates.overseerr.success
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                  }`}
+                >
+                  {testStates.overseerr.success ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  ) : (
+                    <XCircle className="w-3.5 h-3.5 shrink-0" />
+                  )}
+                  <span>
+                    {testStates.overseerr.success
+                      ? `Connected successfully to Overseerr!${
+                          testStates.overseerr.details?.version
+                            ? ` (v${testStates.overseerr.details.version})`
+                            : ''
+                        }`
+                      : `Error: ${testStates.overseerr.error}`}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Prowlarr */}
@@ -669,6 +693,30 @@ export const Settings: React.FC = () => {
                   className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-200 font-mono"
                 />
               </div>
+              {testStates.prowlarr && (
+                <div
+                  className={`flex items-center space-x-2 text-xs p-2.5 rounded-lg border ${
+                    testStates.prowlarr.success
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                  }`}
+                >
+                  {testStates.prowlarr.success ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  ) : (
+                    <XCircle className="w-3.5 h-3.5 shrink-0" />
+                  )}
+                  <span>
+                    {testStates.prowlarr.success
+                      ? `Connected successfully to Prowlarr!${
+                          testStates.prowlarr.details?.version
+                            ? ` (v${testStates.prowlarr.details.version})`
+                            : ''
+                        }`
+                      : `Error: ${testStates.prowlarr.error}`}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
