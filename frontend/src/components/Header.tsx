@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Play, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Play, RefreshCw, CheckCircle2, Menu } from 'lucide-react';
 import { api } from '../api/client';
 import { usePolling } from '../hooks/usePolling';
+import { useLayoutContext } from './Layout';
 
 interface HeaderProps {
   title: string;
@@ -16,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
   onRefresh,
   isScanning: propIsScanning = false,
 }) => {
+  const { toggleMobileMenu } = useLayoutContext();
   const [triggering, setTriggering] = useState(false);
   const [triggerSuccess, setTriggerSuccess] = useState(false);
 
@@ -50,20 +52,37 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="h-16 border-b border-slate-800/80 bg-slate-950/40 backdrop-blur-md px-8 flex items-center justify-between shrink-0">
-      <div>
-        <h1 className="text-lg font-bold text-white tracking-tight">{title}</h1>
-        {subtitle && (
-          <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
-        )}
+    <header className="h-16 border-b border-slate-800/80 bg-slate-950/40 backdrop-blur-md px-4 sm:px-6 lg:px-8 flex items-center justify-between shrink-0">
+      <div className="flex items-center min-w-0 mr-3">
+        {/* Mobile menu hamburger toggle button */}
+        <button
+          onClick={toggleMobileMenu}
+          className="p-2 -ml-2 mr-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 lg:hidden transition-colors shrink-0"
+          title="Open Navigation Menu"
+          aria-label="Open Navigation Menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-lg font-bold text-white tracking-tight truncate">
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 truncate hidden sm:block">
+              {subtitle}
+            </p>
+          )}
+        </div>
       </div>
 
-      <div className="flex items-center space-x-3">
+      <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
         {onRefresh && (
           <button
             onClick={onRefresh}
             className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 rounded-xl transition-colors border border-transparent hover:border-slate-700"
             title="Refresh Data"
+            aria-label="Refresh Data"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -72,7 +91,7 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={handleScanNow}
           disabled={activeScan}
-          className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shadow-md ${
+          className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shadow-md shrink-0 min-h-[38px] ${
             triggerSuccess
               ? 'bg-emerald-600 text-white'
               : activeScan
@@ -82,18 +101,21 @@ export const Header: React.FC<HeaderProps> = ({
         >
           {activeScan ? (
             <>
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              <span>Scanning Library...</span>
+              <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
+              <span className="hidden sm:inline">Scanning Library...</span>
+              <span className="sm:hidden">Scanning...</span>
             </>
           ) : triggerSuccess ? (
             <>
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Scan Initiated!</span>
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Scan Initiated!</span>
+              <span className="sm:hidden">Started!</span>
             </>
           ) : (
             <>
-              <Play className="w-3.5 h-3.5 fill-current" />
-              <span>Scan Library Now</span>
+              <Play className="w-3.5 h-3.5 fill-current shrink-0" />
+              <span className="hidden sm:inline">Scan Library Now</span>
+              <span className="sm:hidden">Scan</span>
             </>
           )}
         </button>

@@ -82,31 +82,33 @@ export const SeedWatch: React.FC = () => {
         onRefresh={refresh}
       />
 
-      <div className="p-8 space-y-6 max-w-7xl w-full mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
         {/* Banner with explanation of safeguards */}
-        <div className="glass-card p-5 border-blue-500/20 bg-blue-950/10 flex items-start space-x-4">
-          <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0 mt-0.5">
-            <Clock className="w-5 h-5" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-sm font-bold text-white tracking-tight">
-              Hardlink & Seeding Safeguards Active
-            </h3>
-            <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-              When duplicates are detected, library-side hardlinks are unlinked so Plex and *arr stop displaying redundant files. The underlying files remain active in qBittorrent to maintain your tracker ratio. As soon as a torrent hits either the target ratio (e.g. 1.0) or seeding duration (e.g. 90 days), it is automatically purged from disk and client.
-            </p>
+        <div className="glass-card p-4 sm:p-5 border-blue-500/20 bg-blue-950/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 sm:gap-4">
+          <div className="flex items-start space-x-3 sm:space-x-4 flex-1">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0 mt-0.5">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white tracking-tight">
+                Hardlink & Seeding Safeguards Active
+              </h3>
+              <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                When duplicates are detected, library-side hardlinks are unlinked so Plex and *arr stop displaying redundant files. The underlying files remain active in qBittorrent to maintain your tracker ratio. As soon as a torrent hits either the target ratio (e.g. 1.0) or seeding duration (e.g. 90 days), it is automatically purged from disk and client.
+              </p>
+            </div>
           </div>
           <button
             onClick={handleCheckNow}
             disabled={checking}
-            className="flex items-center space-x-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold shrink-0 transition-colors"
+            className="w-full sm:w-auto justify-center flex items-center space-x-2 px-3.5 py-2.5 sm:py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold shrink-0 transition-colors min-h-[40px] sm:min-h-0"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${checking ? 'animate-spin' : ''}`} />
             <span>Check Status Now</span>
           </button>
         </div>
 
-        {/* Watchlist Table */}
+        {/* Watchlist Content */}
         {loading && !entries ? (
           <LoadingSpinner message="Querying qBittorrent seed locks..." />
         ) : !entries || entries.length === 0 ? (
@@ -116,138 +118,237 @@ export const SeedWatch: React.FC = () => {
             icon={Clock}
           />
         ) : (
-          <div className="glass-card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-900/80 border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
-                  <tr>
-                    <th className="py-3.5 px-4">Title / Torrent</th>
-                    <th className="py-3.5 px-4 min-w-[180px]">Share Ratio</th>
-                    <th className="py-3.5 px-4 min-w-[180px]">Seeding Time</th>
-                    <th className="py-3.5 px-4">Estimated Unlock</th>
-                    <th className="py-3.5 px-4">Status</th>
-                    <th className="py-3.5 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 font-mono">
-                  {entries.map((entry) => (
-                    <tr
-                      key={entry.id}
-                      className="hover:bg-slate-800/30 transition-colors"
-                    >
-                      {/* Title & Torrent info */}
-                      <td className="py-4 px-4 font-sans">
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2 rounded-lg bg-slate-800 text-slate-400 shrink-0">
-                            {entry.media_type === 'movie' ? (
-                              <Film className="w-4 h-4" />
-                            ) : (
-                              <Tv className="w-4 h-4" />
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <span className="font-semibold text-white block truncate max-w-sm">
-                              {entry.title}
-                            </span>
-                            <span className="text-[11px] text-slate-400 font-mono block truncate max-w-sm">
-                              {entry.torrent_name}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Ratio Progress */}
-                      <td className="py-4 px-4">
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-slate-200">
-                              {entry.current_ratio.toFixed(2)} /{' '}
-                              <span className="text-slate-400">
-                                {entry.target_ratio.toFixed(2)}
-                              </span>
-                            </span>
-                            <span className="text-slate-400 text-[11px]">
-                              {entry.ratio_progress_percent}%
-                            </span>
-                          </div>
-                          <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full transition-all duration-300 ${getProgressBarColor(
-                                entry.ratio_progress_percent
-                              )}`}
-                              style={{
-                                width: `${Math.min(100, entry.ratio_progress_percent)}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Days Progress */}
-                      <td className="py-4 px-4">
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-slate-200">
-                              {entry.current_seed_days} /{' '}
-                              <span className="text-slate-400">
-                                {entry.target_seed_days} days
-                              </span>
-                            </span>
-                            <span className="text-slate-400 text-[11px]">
-                              {entry.days_progress_percent}%
-                            </span>
-                          </div>
-                          <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full transition-all duration-300 ${getProgressBarColor(
-                                entry.days_progress_percent
-                              )}`}
-                              style={{
-                                width: `${Math.min(100, entry.days_progress_percent)}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Unlock Date */}
-                      <td className="py-4 px-4 text-slate-300 font-sans text-xs">
-                        {entry.status === 'PURGED' ? (
-                          <span className="text-slate-500">Purged</span>
-                        ) : entry.ratio_progress_percent >= 100 ||
-                          entry.days_progress_percent >= 100 ? (
-                          <span className="text-emerald-400 font-semibold flex items-center">
-                            <CheckCircle className="w-3.5 h-3.5 mr-1" />
-                            Ready for purge
-                          </span>
+          <>
+            {/* Mobile Card List (md:hidden) for compact & folding displays */}
+            <div className="md:hidden space-y-3.5">
+              {entries.map((entry) => (
+                <div key={entry.id} className="glass-card p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2.5">
+                    <div className="flex items-start space-x-2.5 min-w-0">
+                      <div className="p-2 rounded-lg bg-slate-800 text-slate-400 shrink-0 mt-0.5">
+                        {entry.media_type === 'movie' ? (
+                          <Film className="w-4 h-4" />
                         ) : (
-                          formatDate(entry.estimated_unlock_date)
+                          <Tv className="w-4 h-4" />
                         )}
-                      </td>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="font-semibold text-white block text-sm break-words line-clamp-2">
+                          {entry.title}
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-mono block break-all line-clamp-1 mt-0.5">
+                          {entry.torrent_name}
+                        </span>
+                      </div>
+                    </div>
+                    <StatusBadge status={entry.status} type="seed" />
+                  </div>
 
-                      {/* Status */}
-                      <td className="py-4 px-4 font-sans">
-                        <StatusBadge status={entry.status} type="seed" />
-                      </td>
+                  <div className="space-y-2.5 pt-1">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-400">Share Ratio:</span>
+                        <span className="text-slate-200 font-mono font-medium">
+                          {entry.current_ratio.toFixed(2)} / {entry.target_ratio.toFixed(2)} ({entry.ratio_progress_percent}%)
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-300 ${getProgressBarColor(
+                            entry.ratio_progress_percent
+                          )}`}
+                          style={{
+                            width: `${Math.min(100, entry.ratio_progress_percent)}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
 
-                      {/* Actions */}
-                      <td className="py-4 px-4 text-right">
-                        {entry.status !== 'PURGED' && (
-                          <button
-                            onClick={() => handleForcePurge(entry)}
-                            className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                            title="Force purge from qBittorrent"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-400">Seeding Duration:</span>
+                        <span className="text-slate-200 font-mono font-medium">
+                          {entry.current_seed_days} / {entry.target_seed_days} days ({entry.days_progress_percent}%)
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-300 ${getProgressBarColor(
+                            entry.days_progress_percent
+                          )}`}
+                          style={{
+                            width: `${Math.min(100, entry.days_progress_percent)}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 text-xs">
+                    <div className="text-slate-300 text-xs font-sans">
+                      {entry.status === 'PURGED' ? (
+                        <span className="text-slate-500">Purged</span>
+                      ) : entry.ratio_progress_percent >= 100 ||
+                        entry.days_progress_percent >= 100 ? (
+                        <span className="text-emerald-400 font-semibold flex items-center">
+                          <CheckCircle className="w-3.5 h-3.5 mr-1 shrink-0" />
+                          Ready for purge
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">
+                          Unlock: <span className="text-slate-200">{formatDate(entry.estimated_unlock_date)}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {entry.status !== 'PURGED' && (
+                      <button
+                        onClick={() => handleForcePurge(entry)}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-medium transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                        <span>Force Purge</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
+
+            {/* Desktop Table View (hidden md:block) */}
+            <div className="hidden md:block glass-card overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-900/80 border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+                    <tr>
+                      <th className="py-3.5 px-4">Title / Torrent</th>
+                      <th className="py-3.5 px-4 min-w-[180px]">Share Ratio</th>
+                      <th className="py-3.5 px-4 min-w-[180px]">Seeding Time</th>
+                      <th className="py-3.5 px-4">Estimated Unlock</th>
+                      <th className="py-3.5 px-4">Status</th>
+                      <th className="py-3.5 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-mono">
+                    {entries.map((entry) => (
+                      <tr
+                        key={entry.id}
+                        className="hover:bg-slate-800/30 transition-colors"
+                      >
+                        {/* Title & Torrent info */}
+                        <td className="py-4 px-4 font-sans">
+                          <div className="flex items-center space-x-3">
+                            <div className="p-2 rounded-lg bg-slate-800 text-slate-400 shrink-0">
+                              {entry.media_type === 'movie' ? (
+                                <Film className="w-4 h-4" />
+                              ) : (
+                                <Tv className="w-4 h-4" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-semibold text-white block truncate max-w-sm">
+                                {entry.title}
+                              </span>
+                              <span className="text-[11px] text-slate-400 font-mono block truncate max-w-sm">
+                                {entry.torrent_name}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Ratio Progress */}
+                        <td className="py-4 px-4">
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-slate-200">
+                                {entry.current_ratio.toFixed(2)} /{' '}
+                                <span className="text-slate-400">
+                                  {entry.target_ratio.toFixed(2)}
+                                </span>
+                              </span>
+                              <span className="text-slate-400 text-[11px]">
+                                {entry.ratio_progress_percent}%
+                              </span>
+                            </div>
+                            <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full transition-all duration-300 ${getProgressBarColor(
+                                  entry.ratio_progress_percent
+                                )}`}
+                                style={{
+                                  width: `${Math.min(100, entry.ratio_progress_percent)}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Days Progress */}
+                        <td className="py-4 px-4">
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-slate-200">
+                                {entry.current_seed_days} /{' '}
+                                <span className="text-slate-400">
+                                  {entry.target_seed_days} days
+                                </span>
+                              </span>
+                              <span className="text-slate-400 text-[11px]">
+                                {entry.days_progress_percent}%
+                              </span>
+                            </div>
+                            <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full transition-all duration-300 ${getProgressBarColor(
+                                  entry.days_progress_percent
+                                )}`}
+                                style={{
+                                  width: `${Math.min(100, entry.days_progress_percent)}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Unlock Date */}
+                        <td className="py-4 px-4 text-slate-300 font-sans text-xs">
+                          {entry.status === 'PURGED' ? (
+                            <span className="text-slate-500">Purged</span>
+                          ) : entry.ratio_progress_percent >= 100 ||
+                            entry.days_progress_percent >= 100 ? (
+                            <span className="text-emerald-400 font-semibold flex items-center">
+                              <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                              Ready for purge
+                            </span>
+                          ) : (
+                            formatDate(entry.estimated_unlock_date)
+                          )}
+                        </td>
+
+                        {/* Status */}
+                        <td className="py-4 px-4 font-sans">
+                          <StatusBadge status={entry.status} type="seed" />
+                        </td>
+
+                        {/* Actions */}
+                        <td className="py-4 px-4 text-right">
+                          {entry.status !== 'PURGED' && (
+                            <button
+                              onClick={() => handleForcePurge(entry)}
+                              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                              title="Force purge from qBittorrent"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
         )}
       </div>
 

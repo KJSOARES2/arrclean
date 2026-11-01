@@ -149,12 +149,12 @@ export const Duplicates: React.FC = () => {
         onRefresh={refresh}
       />
 
-      <div className="p-8 space-y-6 max-w-7xl w-full mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-6 max-w-7xl w-full mx-auto">
         {/* Filters and Controls */}
-        <div className="glass-card p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3 flex-1">
+        <div className="glass-card p-3.5 sm:p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-4">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 flex-1">
             {/* Search */}
-            <div className="relative min-w-[240px]">
+            <div className="relative w-full sm:w-auto flex-1 min-w-0 sm:min-w-[200px]">
               <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
               <input
                 type="text"
@@ -175,7 +175,7 @@ export const Duplicates: React.FC = () => {
                 setStatusFilter(e.target.value);
                 setPage(1);
               }}
-              className="bg-slate-900 border border-slate-800 text-xs text-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500"
+              className="w-full sm:w-auto bg-slate-900 border border-slate-800 text-xs text-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500"
             >
               <option value="">All Statuses</option>
               <option value="PENDING_REVIEW">Pending Review</option>
@@ -192,7 +192,7 @@ export const Duplicates: React.FC = () => {
                 setMediaTypeFilter(e.target.value);
                 setPage(1);
               }}
-              className="bg-slate-900 border border-slate-800 text-xs text-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500"
+              className="w-full sm:w-auto bg-slate-900 border border-slate-800 text-xs text-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500"
             >
               <option value="">All Media Types</option>
               <option value="movie">Movies</option>
@@ -201,20 +201,20 @@ export const Duplicates: React.FC = () => {
           </div>
 
           {/* Bulk Action */}
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 shrink-0">
             <button
               onClick={handleExecuteApproved}
-              className="flex items-center space-x-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-950/40 transition-colors"
+              className="flex items-center justify-center space-x-2 px-3.5 py-2.5 sm:py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-950/40 transition-colors min-h-[40px] sm:min-h-0"
               title="Process and execute cleanup on all approved pairs"
             >
-              <Play className="w-4 h-4" />
+              <Play className="w-4 h-4 shrink-0" />
               <span>Execute Approved</span>
             </button>
             <button
               onClick={handleApproveAll}
-              className="flex items-center space-x-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-emerald-950/40 transition-colors"
+              className="flex items-center justify-center space-x-2 px-3.5 py-2.5 sm:py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-emerald-950/40 transition-colors min-h-[40px] sm:min-h-0"
             >
-              <CheckCheck className="w-4 h-4" />
+              <CheckCheck className="w-4 h-4 shrink-0" />
               <span>Approve All Pending</span>
             </button>
           </div>
@@ -238,17 +238,17 @@ export const Duplicates: React.FC = () => {
                 className="glass-card overflow-hidden border border-slate-800/80 hover:border-slate-700/80 transition-all"
               >
                 {/* Pair Header */}
-                <div className="p-4 bg-slate-900/60 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 rounded-xl bg-slate-800 text-slate-400">
+                <div className="p-3.5 sm:p-4 bg-slate-900/60 border-b border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <div className="p-2 rounded-xl bg-slate-800 text-slate-400 shrink-0">
                       {pair.media_type === 'movie' ? (
                         <Film className="w-4 h-4" />
                       ) : (
                         <Tv className="w-4 h-4" />
                       )}
                     </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-white tracking-tight">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-bold text-white tracking-tight break-words line-clamp-2 sm:line-clamp-1">
                         {pair.title}
                       </h3>
                       <div className="flex items-center space-x-2 text-[11px] text-slate-400 font-mono mt-0.5">
@@ -259,7 +259,7 @@ export const Duplicates: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto shrink-0">
                     <span className="text-xs font-mono text-emerald-400">
                       Potential saving: {formatBytes(pair.space_saved_bytes)}
                     </span>
@@ -270,11 +270,11 @@ export const Duplicates: React.FC = () => {
                 {/* Side-by-Side Comparison */}
                 <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-800/80">
                   {/* Winner Card */}
-                  <div className="p-5 bg-emerald-950/5 flex flex-col justify-between">
+                  <div className="p-3.5 sm:p-5 bg-emerald-950/5 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-3">
                         <span className="flex items-center text-xs font-bold text-emerald-400 tracking-wide uppercase">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 mr-2 animate-pulse" />
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 mr-2 animate-pulse shrink-0" />
                           🏆 WINNER (Keep)
                         </span>
                         <QualityBadge
@@ -284,7 +284,7 @@ export const Duplicates: React.FC = () => {
                       </div>
 
                       <div className="space-y-2 text-xs">
-                        <div className="text-slate-300 font-mono break-all line-clamp-2 bg-slate-950/60 p-2 rounded-lg border border-slate-800/60">
+                        <div className="text-slate-300 font-mono break-all line-clamp-2 bg-slate-950/60 p-2 rounded-lg border border-slate-800/60 text-[11px] sm:text-xs">
                           {pair.winner?.file_path}
                         </div>
 
@@ -382,40 +382,40 @@ export const Duplicates: React.FC = () => {
                 </div>
 
                 {/* Card Action Controls */}
-                <div className="px-5 py-3 bg-slate-900/40 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center space-x-2">
+                <div className="p-3 sm:px-5 sm:py-3 bg-slate-900/40 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+                  <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
                     <button
                       onClick={() => handleSwap(pair.id)}
-                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors"
+                      className="flex items-center justify-center space-x-1.5 px-3 py-2 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors min-h-[40px] sm:min-h-0"
                       title="Swap Winner and Loser"
                     >
-                      <ArrowRightLeft className="w-3.5 h-3.5" />
+                      <ArrowRightLeft className="w-3.5 h-3.5 shrink-0" />
                       <span>Swap Winner</span>
                     </button>
                     <button
                       onClick={() => handleIgnore(pair.id)}
-                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs font-medium transition-colors"
+                      className="flex items-center justify-center space-x-1.5 px-3 py-2 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs font-medium transition-colors min-h-[40px] sm:min-h-0"
                       title="Ignore this pair"
                     >
-                      <EyeOff className="w-3.5 h-3.5" />
+                      <EyeOff className="w-3.5 h-3.5 shrink-0" />
                       <span>Ignore</span>
                     </button>
                   </div>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
                     <button
                       onClick={() => handleForceDelete(pair)}
-                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-medium transition-colors"
+                      className="flex items-center justify-center space-x-1.5 px-3 py-2 sm:py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-medium transition-colors min-h-[40px] sm:min-h-0"
                       title="Bypass Seeding Retention & Force Delete"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3.5 h-3.5 shrink-0" />
                       <span>Force Delete</span>
                     </button>
                     <button
                       onClick={() => handleApprove(pair.id)}
-                      className="flex items-center space-x-1.5 px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-950/40 transition-colors"
+                      className="flex items-center justify-center space-x-1.5 px-3 sm:px-4 py-2 sm:py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-950/40 transition-colors min-h-[40px] sm:min-h-0"
                     >
-                      <Check className="w-3.5 h-3.5" />
+                      <Check className="w-3.5 h-3.5 shrink-0" />
                       <span>Approve Decision</span>
                     </button>
                   </div>
@@ -425,8 +425,8 @@ export const Duplicates: React.FC = () => {
 
             {/* Pagination Controls */}
             {data.pages > 1 && (
-              <div className="flex items-center justify-between p-4 glass-card">
-                <span className="text-xs text-slate-400">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 sm:p-4 glass-card">
+                <span className="text-xs text-slate-400 text-center sm:text-left">
                   Showing page <span className="font-bold text-white">{data.page}</span> of{' '}
                   <span className="font-bold text-white">{data.pages}</span> ({data.total} total)
                 </span>
@@ -434,14 +434,16 @@ export const Duplicates: React.FC = () => {
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={data.page <= 1}
-                    className="p-2 rounded-lg bg-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors"
+                    className="p-2 rounded-lg bg-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors min-h-[38px] min-w-[38px] flex items-center justify-center"
+                    aria-label="Previous Page"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setPage((p) => Math.min(data.pages, p + 1))}
                     disabled={data.page >= data.pages}
-                    className="p-2 rounded-lg bg-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors"
+                    className="p-2 rounded-lg bg-slate-800 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors min-h-[38px] min-w-[38px] flex items-center justify-center"
+                    aria-label="Next Page"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>

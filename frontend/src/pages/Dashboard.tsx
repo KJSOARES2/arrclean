@@ -73,11 +73,11 @@ export const Dashboard: React.FC = () => {
         isScanning={isScanning}
       />
 
-      <div className="p-8 space-y-8 max-w-7xl w-full mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 max-w-7xl w-full mx-auto">
         {/* 1. Stat Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
           {/* Lifetime Reclaimed */}
-          <div className="glass-card p-6 relative overflow-hidden group">
+          <div className="glass-card p-4 sm:p-6 relative overflow-hidden group">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 Space Reclaimed
@@ -86,19 +86,19 @@ export const Dashboard: React.FC = () => {
                 <HardDrive className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-4">
-              <div className="text-3xl font-bold tracking-tight text-white font-mono">
+            <div className="mt-3 sm:mt-4">
+              <div className="text-2xl sm:text-3xl font-bold tracking-tight text-white font-mono truncate">
                 {statsLoading ? '...' : formatBytes(stats?.total_space_reclaimed_bytes ?? 0)}
               </div>
               <div className="flex items-center text-xs text-emerald-400 mt-2 font-medium">
-                <ArrowUpRight className="w-3.5 h-3.5 mr-0.5" />
-                <span>{stats?.duplicates_resolved_count ?? 0} duplicates purged</span>
+                <ArrowUpRight className="w-3.5 h-3.5 mr-0.5 shrink-0" />
+                <span className="truncate">{stats?.duplicates_resolved_count ?? 0} duplicates purged</span>
               </div>
             </div>
           </div>
 
           {/* Pending Reclaim (Seed-Locked) */}
-          <div className="glass-card p-6 relative overflow-hidden group">
+          <div className="glass-card p-4 sm:p-6 relative overflow-hidden group">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 Pending Reclaim
@@ -107,18 +107,18 @@ export const Dashboard: React.FC = () => {
                 <Clock className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-4">
-              <div className="text-3xl font-bold tracking-tight text-white font-mono">
+            <div className="mt-3 sm:mt-4">
+              <div className="text-2xl sm:text-3xl font-bold tracking-tight text-white font-mono truncate">
                 {statsLoading ? '...' : formatBytes(stats?.pending_space_to_reclaim_bytes ?? 0)}
               </div>
-              <div className="text-xs text-slate-400 mt-2">
-                Locked in qBittorrent seeding ({stats?.seed_locked_count ?? 0} torrents)
+              <div className="text-xs text-slate-400 mt-2 truncate">
+                Locked in qBittorrent ({stats?.seed_locked_count ?? 0} torrents)
               </div>
             </div>
           </div>
 
           {/* Duplicates Found */}
-          <div className="glass-card p-6 relative overflow-hidden group">
+          <div className="glass-card p-4 sm:p-6 relative overflow-hidden group">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 Duplicates Detected
@@ -127,18 +127,18 @@ export const Dashboard: React.FC = () => {
                 <Layers className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-4">
-              <div className="text-3xl font-bold tracking-tight text-white font-mono">
+            <div className="mt-3 sm:mt-4">
+              <div className="text-2xl sm:text-3xl font-bold tracking-tight text-white font-mono truncate">
                 {statsLoading ? '...' : stats?.duplicates_found_count ?? 0}
               </div>
-              <div className="text-xs text-amber-400 mt-2 font-medium">
+              <div className="text-xs text-amber-400 mt-2 font-medium truncate">
                 {stats?.pending_review_count ?? 0} awaiting manual review
               </div>
             </div>
           </div>
 
           {/* Scan State */}
-          <div className="glass-card p-6 relative overflow-hidden group">
+          <div className="glass-card p-4 sm:p-6 relative overflow-hidden group">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 Engine Status
@@ -153,16 +153,16 @@ export const Dashboard: React.FC = () => {
                 <Activity className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-4">
+            <div className="mt-3 sm:mt-4">
               <div className="text-xl font-bold tracking-tight text-white flex items-center space-x-2">
                 <span
-                  className={`w-2.5 h-2.5 rounded-full ${
+                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                     isScanning ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'
                   }`}
                 />
-                <span>{isScanning ? 'Scan Running' : 'Engine Idle'}</span>
+                <span className="truncate">{isScanning ? 'Scan Running' : 'Engine Idle'}</span>
               </div>
-              <div className="text-xs text-slate-400 mt-2 font-mono">
+              <div className="text-xs text-slate-400 mt-2 font-mono truncate">
                 Last: {formatRelativeTime(stats?.last_scan_completed_at)}
               </div>
             </div>
@@ -170,8 +170,8 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* 2. 30-Day Storage Reclaimed Area Chart */}
-        <div className="glass-card p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="glass-card p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 sm:mb-6">
             <div>
               <h2 className="text-base font-bold text-white tracking-tight">
                 Cumulative Space Reclaimed (30 Days)
@@ -180,12 +180,12 @@ export const Dashboard: React.FC = () => {
                 Storage savings over time from automated deduplication & ratio expirations
               </p>
             </div>
-            <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+            <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20 self-start sm:self-auto">
               Gigabytes (GB)
             </span>
           </div>
 
-          <div className="h-72 w-full">
+          <div className="h-56 sm:h-72 w-full">
             {historyLoading ? (
               <LoadingSpinner message="Loading historical telemetry..." />
             ) : !history || history.length === 0 ? (
@@ -240,14 +240,14 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* 3. Breakdown Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Resolution Breakdown */}
-          <div className="glass-card p-6 flex flex-col">
+          <div className="glass-card p-4 sm:p-6 flex flex-col">
             <h3 className="text-sm font-bold text-white tracking-tight mb-1">
               By Resolution
             </h3>
             <p className="text-xs text-slate-400 mb-4">Duplicate distribution by video resolution</p>
-            <div className="h-48 flex-1">
+            <div className="h-44 sm:h-48 flex-1">
               {breakdownLoading ? (
                 <LoadingSpinner />
               ) : !breakdown?.by_resolution?.length ? (
@@ -261,8 +261,8 @@ export const Dashboard: React.FC = () => {
                       data={breakdown.by_resolution}
                       cx="50%"
                       cy="50%"
-                      innerRadius={50}
-                      outerRadius={75}
+                      innerRadius={45}
+                      outerRadius={70}
                       paddingAngle={4}
                       dataKey="value"
                     >
@@ -288,7 +288,7 @@ export const Dashboard: React.FC = () => {
               {breakdown?.by_resolution?.map((item, idx) => (
                 <span key={item.name} className="flex items-center text-xs text-slate-300">
                   <span
-                    className="w-2.5 h-2.5 rounded-full mr-1.5"
+                    className="w-2.5 h-2.5 rounded-full mr-1.5 shrink-0"
                     style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }}
                   />
                   {item.name}: {item.value}
@@ -298,12 +298,12 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Dynamic Range Breakdown */}
-          <div className="glass-card p-6 flex flex-col">
+          <div className="glass-card p-4 sm:p-6 flex flex-col">
             <h3 className="text-sm font-bold text-white tracking-tight mb-1">
               By Dynamic Range
             </h3>
             <p className="text-xs text-slate-400 mb-4">HDR10 / Dolby Vision vs SDR</p>
-            <div className="h-48 flex-1">
+            <div className="h-44 sm:h-48 flex-1">
               {breakdownLoading ? (
                 <LoadingSpinner />
               ) : !breakdown?.by_hdr?.length ? (
@@ -317,8 +317,8 @@ export const Dashboard: React.FC = () => {
                       data={breakdown.by_hdr}
                       cx="50%"
                       cy="50%"
-                      innerRadius={50}
-                      outerRadius={75}
+                      innerRadius={45}
+                      outerRadius={70}
                       paddingAngle={4}
                       dataKey="value"
                     >
@@ -344,7 +344,7 @@ export const Dashboard: React.FC = () => {
               {breakdown?.by_hdr?.map((item, idx) => (
                 <span key={item.name} className="flex items-center text-xs text-slate-300">
                   <span
-                    className="w-2.5 h-2.5 rounded-full mr-1.5"
+                    className="w-2.5 h-2.5 rounded-full mr-1.5 shrink-0"
                     style={{ backgroundColor: PIE_COLORS[(idx + 2) % PIE_COLORS.length] }}
                   />
                   {item.name}: {item.value}
@@ -354,12 +354,12 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Source Breakdown (Usenet vs Torrent) */}
-          <div className="glass-card p-6 flex flex-col">
+          <div className="glass-card p-4 sm:p-6 flex flex-col sm:col-span-2 lg:col-span-1">
             <h3 className="text-sm font-bold text-white tracking-tight mb-1">
               By Acquisition Source
             </h3>
             <p className="text-xs text-slate-400 mb-4">Usenet downloads vs Seeding torrents</p>
-            <div className="h-48 flex-1">
+            <div className="h-44 sm:h-48 flex-1">
               {breakdownLoading ? (
                 <LoadingSpinner />
               ) : !breakdown?.by_source?.length ? (
@@ -388,7 +388,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* 4. Recent Activity Stream */}
-        <div className="glass-card p-6">
+        <div className="glass-card p-4 sm:p-6">
           <h2 className="text-base font-bold text-white tracking-tight mb-4">
             Recent Telemetry & Actions
           </h2>
@@ -403,15 +403,15 @@ export const Dashboard: React.FC = () => {
               {activity.map((act) => (
                 <div
                   key={act.id}
-                  className="py-3 flex items-center justify-between hover:bg-slate-800/30 px-3 rounded-lg transition-colors"
+                  className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-800/30 px-3 rounded-lg transition-colors"
                 >
-                  <div className="flex items-center space-x-3">
-                    <span className="text-xs font-mono uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-400">
+                  <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                    <span className="text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0">
                       {act.media_type}
                     </span>
-                    <span className="font-medium text-sm text-slate-200">{act.title}</span>
+                    <span className="font-medium text-sm text-slate-200 truncate">{act.title}</span>
                   </div>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-3 self-end sm:self-auto text-xs shrink-0 flex-wrap gap-y-1">
                     <span className="text-xs text-emerald-400 font-mono">
                       {act.space_saved_bytes > 0 ? `+${formatBytes(act.space_saved_bytes)} saved` : 'Seed-Locked'}
                     </span>

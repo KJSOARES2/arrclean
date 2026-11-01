@@ -21,6 +21,14 @@
   }
 }
 
+/* Safe area padding utilities for mobile notches and gesture bars */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
 .glass-panel {
   @apply bg-slate-900/70 backdrop-blur-md border border-slate-800/80 shadow-xl;
 }

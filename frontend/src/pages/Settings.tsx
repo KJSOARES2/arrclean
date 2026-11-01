@@ -144,10 +144,10 @@ export const Settings: React.FC = () => {
         subtitle="Manage service connections, seeding retention rules, scoring weights, and automation schedules"
       />
 
-      <div className="p-8 space-y-8 max-w-5xl w-full mx-auto pb-24">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 max-w-5xl w-full mx-auto pb-28 sm:pb-24">
         {/* Safety Warning Banner if Live */}
         {!dryRun ? (
-          <div className="glass-card p-5 border-rose-500/40 bg-rose-950/20 flex items-start space-x-4 animate-pulse">
+          <div className="glass-card p-4 sm:p-5 border-rose-500/40 bg-rose-950/20 flex flex-col sm:flex-row items-start gap-3 sm:gap-4 animate-pulse">
             <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/30 shrink-0">
               <ShieldAlert className="w-6 h-6" />
             </div>
@@ -161,8 +161,8 @@ export const Settings: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="glass-card p-4 border-amber-500/20 bg-amber-950/10 flex items-center space-x-3 text-amber-300 text-xs">
-            <CheckCircle2 className="w-5 h-5 text-amber-400 shrink-0" />
+          <div className="glass-card p-3.5 sm:p-4 border-amber-500/20 bg-amber-950/10 flex items-start sm:items-center space-x-3 text-amber-300 text-xs">
+            <CheckCircle2 className="w-5 h-5 text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
             <span>
               <strong>Dry-Run Mode Enabled (Default Safe State):</strong> Scans will simulate deletions and calculate potential storage savings without modifying files on disk or deleting torrents.
             </span>
@@ -170,7 +170,7 @@ export const Settings: React.FC = () => {
         )}
 
         {/* 1. General & Safety */}
-        <div className="glass-card p-6 space-y-6">
+        <div className="glass-card p-4 sm:p-6 space-y-4 sm:space-y-6">
           <div className="flex items-center space-x-3 border-b border-slate-800 pb-4">
             <div className="p-2 rounded-xl bg-slate-800 text-slate-300">
               <Clock className="w-5 h-5" />
@@ -782,30 +782,30 @@ export const Settings: React.FC = () => {
         </div>
 
         {/* 5. Save & Danger Zone */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4">
           <button
             onClick={() => setConfirmReset(true)}
-            className="flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-colors"
+            className="flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-colors min-h-[42px] sm:min-h-0"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-4 h-4 shrink-0" />
             <span>Reset Database Telemetry</span>
           </button>
 
           <button
             onClick={handleSave}
             disabled={saving}
-            className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all shadow-lg ${
+            className={`flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all shadow-lg min-h-[42px] sm:min-h-0 ${
               saveSuccess
                 ? 'bg-emerald-600 text-white'
                 : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/40'
             }`}
           >
             {saving ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
+              <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
             ) : saveSuccess ? (
-              <CheckCircle2 className="w-4 h-4" />
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
             ) : (
-              <Save className="w-4 h-4" />
+              <Save className="w-4 h-4 shrink-0" />
             )}
             <span>{saveSuccess ? 'Settings Saved!' : 'Save Configuration'}</span>
           </button>
